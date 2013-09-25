@@ -340,7 +340,7 @@ oktellVoice = do ->
 			@UA.on 'connected', (e)=>
 				log 'connected', e
 				#@trigger 'connect'
-			@UA.on 'connected', (e)=>
+			@UA.on 'disconnected', (e)=>
 				@connectedFired = false
 				log 'disconnected', e
 				#@trigger 'disconnect'
@@ -373,14 +373,17 @@ oktellVoice = do ->
 				@currentSession = e.data.session
 				@currentSession.on 'progress', (e)=>
 					log 'currentSession progress', e
+
 				@currentSession.on 'failed', (e)=>
 					log 'currentSession failed', e
+					@trigger 'RTCSessionFailed', @currentSession.remote_identity?.display_name
 				@currentSession.on 'started', (e)=>
 					log 'currentSession started', e
+					@trigger 'RTCSessionStarted', @currentSession.remote_identity?.display_name
 					rtcSession = e.sender
 
 					if rtcSession.getLocalStreams().length > 0
-						log 'currentSession local stream > 0'
+						log 'currentSession local stream > 0', rtcSession.getRemoteStreams()[0].getAudioTracks()
 						@elLocal.src = window.URL.createObjectURL rtcSession.getLocalStreams()[0]
 					else
 						log 'currentSession local stream == 0'
@@ -394,6 +397,7 @@ oktellVoice = do ->
 
 				@currentSession.on 'ended', (e)=>
 					log 'currentSession ended'
+					@trigger 'RTCSessionEnded', @currentSession.remote_identity?.display_name
 
 
 				# incoming or outgoing session

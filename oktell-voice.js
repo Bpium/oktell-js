@@ -564,7 +564,7 @@ oktellVoice = (function() {
       this.UA.on('connected', function(e) {
         return log('connected', e);
       });
-      this.UA.on('connected', function(e) {
+      this.UA.on('disconnected', function(e) {
         _this.connectedFired = false;
         return log('disconnected', e);
       });
@@ -605,15 +605,19 @@ oktellVoice = (function() {
           return log('currentSession progress', e);
         });
         _this.currentSession.on('failed', function(e) {
-          return log('currentSession failed', e);
+          var _ref;
+
+          log('currentSession failed', e);
+          return _this.trigger('RTCSessionFailed', (_ref = _this.currentSession.remote_identity) != null ? _ref.display_name : void 0);
         });
         _this.currentSession.on('started', function(e) {
-          var rtcSession;
+          var rtcSession, _ref;
 
           log('currentSession started', e);
+          _this.trigger('RTCSessionStarted', (_ref = _this.currentSession.remote_identity) != null ? _ref.display_name : void 0);
           rtcSession = e.sender;
           if (rtcSession.getLocalStreams().length > 0) {
-            log('currentSession local stream > 0');
+            log('currentSession local stream > 0', rtcSession.getRemoteStreams()[0].getAudioTracks());
             _this.elLocal.src = window.URL.createObjectURL(rtcSession.getLocalStreams()[0]);
           } else {
             log('currentSession local stream == 0');
@@ -627,7 +631,10 @@ oktellVoice = (function() {
           }
         });
         return _this.currentSession.on('ended', function(e) {
-          return log('currentSession ended');
+          var _ref;
+
+          log('currentSession ended');
+          return _this.trigger('RTCSessionEnded', (_ref = _this.currentSession.remote_identity) != null ? _ref.display_name : void 0);
         });
       });
       return this.UA.start();

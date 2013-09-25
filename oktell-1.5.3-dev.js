@@ -3082,6 +3082,7 @@ Oktell = (function(){
 			_talkTimer: false,
 			sip: false,
 			sipActive: false,
+			sipHasRTCSession: false,
 			states: {
 				DISCONNECTED: -1,
 				READY: 0,
@@ -3101,27 +3102,22 @@ Oktell = (function(){
 					that.sipActive = true;
 				});
 				that.sip.on('disconnect', function(){
+					that.sipHasRTCSession = false;
 					that.sipActive = false;
 				});
-				that.sip.on('ringStart', function(number){
+				that.sip.on('RTCSessionFailed', function(){
 
 				});
-				that.sip.on('ringStop', function(){
-
+				that.sip.on('RTCSessionStarted', function(){
+					that.sipHasRTCSession = true;
+					that.loadStates();
 				});
-				that.sip.on('callStart', function(number){
-
-				});
-				that.sip.on('callStop', function(){
-
-				});
-				that.sip.on('talkStart', function(number){
-
-				});
-				that.sip.on('talkStop', function(){
-
+				that.sip.on('RTCSessionEnded', function(){
+					that.sipHasRTCSession = false;
+					that.loadStates();
 				});
 				that.sip.on('sessionClose', function(){
+					that.sipHasRTCSession = false;
 					that.loadStates();
 				});
 
@@ -3386,6 +3382,8 @@ Oktell = (function(){
 								that.state( that.states.CALL );
 							} else if ( data.linestatestr == 'lsDisconnected' ) {
 								that.state( that.states.DISCONNECTED );
+							} else if ( oldState == that.states.TALK && that.sipHasRTCSession ) {
+
 							} else {
 								that.state( that.states.READY );
 //								if ( oldState !== that.state() && that.sipActive ) {
@@ -3402,7 +3400,7 @@ Oktell = (function(){
 
 						if ( data.abonent ) {
 							if ( ! data.abonent.conferenceid ) {
-								that.setAbonent(data.abonent);
+								that.setAbonent(data.abonent, oldState == that.states.TALK && that.sipHasRTCSession );
 								that.conferenceId(false);
 								setStateFromResultData();
 								callCallback();
@@ -3492,13 +3490,14 @@ Oktell = (function(){
 			 * @param data - loaded info about abonent
 			 * @return {*}
 			 */
-			setAbonent: function(data) {
+			setAbonent: function(data, saveOldAbonentIfEmpty) {
 				var oldKey;
 				if ( size(this.abonentList) ) {
 					each(this.abonentList, function(ab,key){
 						oldKey = key;
 					});
 				}
+				var oldAbonent = this.abonentList[oldKey];
 				this.abonentList = {};
 				var a = data ? this.createAbonent(data) : undefined;
 				if ( a ) {
@@ -3507,6 +3506,8 @@ Oktell = (function(){
 						self.trigger('abonentListChange', this.getAbonents() );
 						self.trigger('abonentsChange', this.getAbonents(true) );
 					}
+				} else if ( oldAbonent && saveOldAbonentIfEmpty ) {
+					this.abonentList[oldKey] = oldAbonent;
 				} else if ( oldKey ) {
 					self.trigger('abonentListChange', this.getAbonents() );
 					self.trigger('abonentsChange', this.getAbonents(true) );
