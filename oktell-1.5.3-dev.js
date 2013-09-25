@@ -4964,7 +4964,11 @@ Oktell = (function(){
 		 * @return {Object}
 		 */
 		self.getNumbers = function(){
-			return numbers;
+			var nums = {}
+			each(numbers, function(u){
+				nums[u.number] = u;
+			});
+			return nums;
 		}
 
 		/**
