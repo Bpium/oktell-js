@@ -3379,10 +3379,10 @@ Oktell = (function(){
 								} else {
 									that.state( that.states.RING );
 								}
-							} else if ( data.abonent.iscommutated || data.abonent.iswaitinginflash || data.abonent.isconference ) {
+							} else if ( data.abonent.iscommutated || data.abonent.iswaitinginflash || data.abonent.isconference || data.abonent.isivr ) {
 								that.startTalkTimer(parseInt(data.timertalklensec) || 0);
 								that.state( that.states.TALK );
-							} else if ( data.abonent.extline || data.abonent.isivr || data.abonent.number ) { // peace of shit
+							} else if ( data.abonent.extline || data.abonent.number ) { // peace of shit
 								that.state( that.states.CALL );
 							} else if ( data.linestatestr == 'lsDisconnected' ) {
 								that.state( that.states.DISCONNECTED );
@@ -3443,12 +3443,19 @@ Oktell = (function(){
 			 * @return {*}
 			 */
 			createAbonent: function(data) {
+				log('create anbonent', data)
 				var key = data.competitorid || data.number || data.userid || data.callerid;
+				if ( ! key && data.isivr ) {
+					key = newGuid();
+				}
 				if ( key ) {
 					var abonent = new Abonent();
 					extend(abonent, {
 						key: key,
 						guid: data.competitorid || data.userid,
+
+						isIvr: data.isivr,
+						ivrName: data.ivrname || undefined,
 
 						isConferenceCompetitor: data.competitorid ? true : false,
 						conferenceId : this.conferenceId(),
@@ -3462,7 +3469,7 @@ Oktell = (function(){
 						phone: data.number ? data.number.toString() : ( data.calledid ? data.callerid.toString() : undefined ),
 						phoneFormatted: data.number ? formatPhone( data.number.toString() ) : undefined,
 
-						name: data.simplename || data.username || data.userlogin || data.number,
+						name: data.simplename || data.username || data.userlogin || data.number || data.ivrname,
 
 						isUser: data.userid ? true : false,
 						user : {
