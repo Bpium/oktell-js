@@ -371,29 +371,37 @@ oktellVoice = do ->
 			@UA.on 'newRTCSession', (e)=>
 				log 'new RTC session', e
 				@currentSession = e.data.session
+
+				onSessionStart = (e)=>
+					log 'currentSession started', e
+					@trigger 'RTCSessionStarted', @currentSession.remote_identity?.display_name
+					if @currentSession?.direction is 'incoming'
+						@trigger 'ringStart', @currentSession?.remote_identity?.display_name, @currentSession?.remote_identity?.toString?()
+
+					if @currentSession.getLocalStreams().length > 0
+						log 'currentSession local stream > 0', @currentSession.getRemoteStreams()[0].getAudioTracks()
+						@elLocal.src = window.URL.createObjectURL @currentSession.getLocalStreams()[0]
+					else
+						log 'currentSession local stream == 0'
+
+					if @currentSession.getRemoteStreams().length > 0
+						log 'currentSession remote stream > 0', @currentSession.getRemoteStreams()[0].getAudioTracks()
+						@elRemote.src = window.URL.createObjectURL @currentSession.getRemoteStreams()[0]
+						@elRemote.play()
+					else
+						log 'currentSession remote stream == 0'
+
+				if @currentSession.direction is 'incoming'
+					onSessionStart()
+				else
+					@currentSession.on 'started', onSessionStart
+
 				@currentSession.on 'progress', (e)=>
 					log 'currentSession progress', e
 
 				@currentSession.on 'failed', (e)=>
 					log 'currentSession failed', e
 					@trigger 'RTCSessionFailed', @currentSession.remote_identity?.display_name
-				@currentSession.on 'started', (e)=>
-					log 'currentSession started', e
-					@trigger 'RTCSessionStarted', @currentSession.remote_identity?.display_name
-					rtcSession = e.sender
-
-					if rtcSession.getLocalStreams().length > 0
-						log 'currentSession local stream > 0', rtcSession.getRemoteStreams()[0].getAudioTracks()
-						@elLocal.src = window.URL.createObjectURL rtcSession.getLocalStreams()[0]
-					else
-						log 'currentSession local stream == 0'
-
-					if rtcSession.getRemoteStreams().length > 0
-						log 'currentSession remote stream > 0', rtcSession.getRemoteStreams()[0].getAudioTracks()
-						@elRemote.src = window.URL.createObjectURL rtcSession.getRemoteStreams()[0]
-						@elRemote.play()
-					else
-						log 'currentSession remote stream == 0'
 
 				@currentSession.on 'ended', (e)=>
 					log 'currentSession ended'
