@@ -4353,7 +4353,10 @@ Oktell = (function(){
 			if ( ! data || ! serverConnected() ) {
 				return a.getActions();
 			}
-
+			// if user has number, but number doesn't exist in numbers, use users's number as argument
+			if ( users[data] && users[data].number && ! numbers[data] && ! numbersById[data] ) {
+				data = users[data].number;
+			}
 			var isMe = oktellInfo.userid == data || oktellInfo.number == data;
 			var hold = phone.isAbonent(data, phone.getHoldInfo().abonent || {} );
 			var obj = users[data] || numbers[data] || numbersById[data];
