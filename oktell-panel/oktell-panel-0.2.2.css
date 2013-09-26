@@ -1,4 +1,4 @@
-/* Oktell-panel.js 0.2.2.1001 http://js.oktell.ru/webpanel */
+/* Oktell-panel.js 0.2.2.1002 http://js.oktell.ru/webpanel */
 
 /* Normalize panel
 ---------------------------------------------------------------*/
@@ -178,7 +178,7 @@
 .oktell_panel.noavatar table .b_contact .b_contact_avatar {
   display: none;
 }
-.oktell_panel.webphone.talking:not(.dtmf) .i_conference .b_contact td.b_contact_title span.o_dtmf {
+.oktell_panel.webphone.talking:not(.dtmf):not(.conference) .i_conference .b_contact td.b_contact_title span.o_dtmf {
   display: inline !important;
 }
 /* Marks

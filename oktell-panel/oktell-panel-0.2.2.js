@@ -1,4 +1,4 @@
-/* Oktell-panel.js 0.2.2.1001 http://js.oktell.ru/webpanel */
+/* Oktell-panel.js 0.2.2.1002 http://js.oktell.ru/webpanel */
 
 /*! Copyright (c) 2013 Brandon Aaron (http://brandonaaron.net)
  * Licensed under the MIT License (LICENSE.txt).
@@ -1284,6 +1284,8 @@ var __slice = [].slice,
       if (this.numberHtml === this.nameHtml) {
         this.numberHtml = '';
       }
+      this.isIvr = data.isIvr;
+      this.ivrName = data.ivrName;
       ns = this.nameHtml.split(/\s+/);
       if (ns.length > 1 && data.name.toString() !== this.number) {
         this.nameHtml1 = ns[0];
@@ -1467,7 +1469,11 @@ var __slice = [].slice,
     CUser.prototype.loadOktellActions = function() {
       var actions;
 
-      actions = this.oktell.getPhoneActions(this.id || this.number);
+      if (this.isIvr) {
+        actions = ['endCall'];
+      } else {
+        actions = this.oktell.getPhoneActions(this.id || this.number);
+      }
       return actions;
     };
 
@@ -2111,6 +2117,12 @@ var __slice = [].slice,
       });
       oktell.on('abonentsChange', function(abonents) {
         if (_this.oktellConnected) {
+          if (oktell.conferenceId()) {
+            _this.panelEl.addClass('conference');
+            _this.hideDtmf();
+          } else {
+            _this.panelEl.removeClass('conference');
+          }
           _this.setAbonents(abonents);
           return _this.reloadActions();
         }
@@ -2201,7 +2213,7 @@ var __slice = [].slice,
       _ref1 = this.headerEls;
       for (i = _j = 0, _len1 = _ref1.length; _j < _len1; i = ++_j) {
         h = _ref1[i];
-        if (h.offset().top > conTop) {
+        if (h.offset().top > conTop || i === this.headerEls.length - 1) {
           this.processStickyHeaders(i - 1);
           break;
         }
@@ -2586,29 +2598,38 @@ var __slice = [].slice,
     };
 
     List.prototype.syncAbonentsAndUserlist = function(abonents, userlist) {
-      var absByNumber, uNumber, user, _results,
+      var absByNumber, uNumber, user, _ref, _results,
         _this = this;
 
       absByNumber = {};
+      if ((abonents != null ? abonents.length : void 0) === 0 || (abonents.length === 1 && (abonents != null ? (_ref = abonents[0]) != null ? _ref.isIvr : void 0 : void 0))) {
+        for (uNumber in userlist) {
+          if (!__hasProp.call(userlist, uNumber)) continue;
+          user = userlist[uNumber];
+          delete userlist[uNumber];
+        }
+      }
       $.each(abonents, function(i, ab) {
-        var number, u;
+        var number, u, _ref1;
 
         if (!ab) {
           return;
         }
-        number = ab.phone.toString() || '';
+        number = ((_ref1 = ab.phone) != null ? typeof _ref1.toString === "function" ? _ref1.toString() : void 0 : void 0) || ab.ivrName || '';
         if (!number) {
           return;
         }
         absByNumber[number] = ab;
-        if (!userlist[ab.phone.toString()]) {
+        if (!userlist[number.toString()]) {
           u = _this.getUser({
             name: ab.name,
-            number: ab.phone,
+            number: ab.phone || '',
             id: ab.userid,
-            state: 1
-          });
-          return userlist[u.number] = u;
+            state: ab.isIvr ? 5 : 1,
+            isIvr: ab.isIvr,
+            ivrName: ab.ivrName
+          }, ab.isIvr);
+          return userlist[number.toString()] = u;
         }
       });
       _results = [];
@@ -2625,10 +2646,14 @@ var __slice = [].slice,
     };
 
     List.prototype.setAbonents = function(abonents) {
-      this.log('setAbonents', abonents);
+      var _this = this;
+
+      this.log('setAbonents', abonents, this.abonents);
       this.syncAbonentsAndUserlist(abonents, this.abonents);
       this.setAbonentsHtml();
-      return this.setUserListHeight();
+      return setTimeout(function() {
+        return _this.setUserListHeight();
+      }, 200);
     };
 
     List.prototype.setQueue = function(queue) {
@@ -2821,12 +2846,12 @@ var __slice = [].slice,
       if (!data.numberFormatted) {
         data.numberFormatted = numberFormatted;
       }
-      if (!dontRemember && ((_ref = this.filterFantomUser) != null ? _ref.number : void 0) === strNumber) {
+      if (!data.isIvr && !dontRemember && ((_ref = this.filterFantomUser) != null ? _ref.number : void 0) === strNumber) {
         this.usersByNumber[strNumber] = this.filterFantomUser;
         data.isFantom = true;
         this.filterFantomUser = false;
       }
-      if (this.usersByNumber[strNumber]) {
+      if (!data.isIvr && this.usersByNumber[strNumber]) {
         if (this.usersByNumber[strNumber].isFantom) {
           this.usersByNumber[strNumber].init(data);
         }
@@ -2837,7 +2862,9 @@ var __slice = [].slice,
         numberFormatted: numberFormatted,
         name: data.name,
         isFantom: true,
-        state: ((data != null ? data.state : void 0) != null ? data.state : 1)
+        state: ((data != null ? data.state : void 0) != null ? data.state : 1),
+        isIvr: data != null ? data.isIvr : void 0,
+        ivrName: data != null ? data.ivrName : void 0
       });
       if (!dontRemember) {
         this.usersByNumber[strNumber] = fantom;
@@ -2943,7 +2970,8 @@ var __slice = [].slice,
     Popup.prototype.logGroup = 'Popup';
 
     function Popup(popupEl, oktell, ringtone) {
-      var _this = this;
+      var abonentsSet,
+        _this = this;
 
       this.el = popupEl;
       this.ringtone = ringtone;
@@ -2966,16 +2994,36 @@ var __slice = [].slice,
       this.el.find('i.o_close').bind('click', function() {
         return _this.hide();
       });
-      oktell.on('ringStart', function(abonents) {
+      abonentsSet = false;
+      oktell.on('webrtcRingStart', function(name, identity) {
+        var _ref;
+
+        _this.log('webrtcRingStart, ' + identity);
         _this.playRingtone(true);
+        _this.answerButtonVisible(true);
+        if (!abonentsSet) {
+          _this.setAbonents([
+            {
+              name: name,
+              phone: ((_ref = identity.match(/<sip:([\s\S]+?)@/)) != null ? _ref[1] : void 0) || ''
+            }
+          ]);
+        }
+        return _this.show();
+      });
+      oktell.on('ringStart', function(abonents) {
+        _this.log('ringStart', abonents);
         _this.setAbonents(abonents);
-        _this.answerButtonVisible(oktell.webphoneIsActive());
+        abonentsSet = true;
         return _this.show();
       });
       oktell.on('ringStop', function() {
         _this.playRingtone(false);
-        return _this.hide();
+        _this.hide();
+        abonentsSet = false;
+        return _this.setAbonents([]);
       });
+      this.answerButtonVisible(false);
     }
 
     Popup.prototype.playRingtone = function(play) {
