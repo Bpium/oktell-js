@@ -3083,6 +3083,7 @@ Oktell = (function(){
 			sip: false,
 			sipActive: false,
 			sipHasRTCSession: false,
+			_notRoutingIvrState: false,
 			states: {
 				DISCONNECTED: -1,
 				READY: 0,
@@ -3125,6 +3126,13 @@ Oktell = (function(){
 					that.loadStates();
 				});
 
+			},
+
+			notRoutingIvrState: function(state){
+				if ( typeof state !== "undefined" && Boolean(state) !== this._notRoutingIvrState ){
+					this._notRoutingIvrState = Boolean(state);
+				}
+				return this._notRoutingIvrState;
 			},
 
 			answer: function() { if ( this.sipActive ) { this.sip.answer(); } },
@@ -3404,7 +3412,11 @@ Oktell = (function(){
 
 						if ( data.abonent ) {
 							if ( ! data.abonent.conferenceid ) {
-								that.setAbonent(data.abonent, ( oldState == that.states.TALK && that.sipHasRTCSession ) || data.abonent.isivr );
+								if ( size(that.abonentList) == 0 || that.notRoutingIvrState() ) {
+									log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SET ABONENT IN LOADSTATES', size(that.abonentList), that.notRoutingIvrState());
+									that.notRoutingIvrState(false);
+									that.setAbonent(data.abonent, ( oldState == that.states.TALK && that.sipHasRTCSession ) || data.abonent.isivr );
+								}
 								that.conferenceId(false);
 								setStateFromResultData();
 								callCallback();
@@ -3445,7 +3457,6 @@ Oktell = (function(){
 			 * @return {*}
 			 */
 			createAbonent: function(data) {
-				log('create anbonent', data)
 				var key = data.competitorid || data.number || data.userid || data.callerid;
 				if ( ! key && data.isivr ) {
 					key = newGuid();
@@ -3471,7 +3482,7 @@ Oktell = (function(){
 						phone: data.number ? data.number.toString() : ( data.calledid ? data.callerid.toString() : undefined ),
 						phoneFormatted: data.number ? formatPhone( data.number.toString() ) : undefined,
 
-						name: data.simplename || data.username || data.userlogin || data.number || data.ivrname,
+						name: data.simplename || data.username || data.name || data.caption || data.userlogin || data.number || data.ivrname,
 
 						isUser: data.userid ? true : false,
 						user : {
@@ -3502,6 +3513,7 @@ Oktell = (function(){
 			 * @return {*}
 			 */
 			setAbonent: function(data, saveOldAbonentIfEmpty) {
+				log('!!!!!!!!!!!!!!!!!!!!!!!!! SET ABONENT');
 				var oldKey;
 				if ( size(this.abonentList) ) {
 					each(this.abonentList, function(ab,key){
@@ -3692,8 +3704,29 @@ Oktell = (function(){
 						that.sip.hold();
 					}
 					that.sip.call(number);
-					//that.state(that.states.CALLWEBPHONE);
-					that.setAbonent({number:number});
+
+					// find user or number and set it as abonent
+					var user = users[number];
+					var numberObj = numbers[number] || numbersById[number];
+//					if ( ! user && numberObj ) {
+////						each(users, function(u){
+////							if ( u.numberObj == numberObj || u.number == number ) {
+////								user = u;
+////								return breaker;
+////							}
+////						});
+//					}
+
+					if ( user ) {
+						log('setAbonent with user');
+						that.setAbonent(user);
+					} else if ( numberObj ) {
+						log('setAbonent with numberObj');
+						that.setAbonent(numberObj);
+					} else {
+						log('setAbonent with number');
+						that.setAbonent({number:number});
+					}
 					callFunc(callback, getSuccessObj());
 				} else if ( that.state() == that.states.READY || that.state() == that.states.TALK ) {
 					// обратный вызов
@@ -4837,10 +4870,8 @@ Oktell = (function(){
 			});
 
 			server.bindOktellEvent('phoneevent_ivrstarted', function(data){
-				if ( data.isroutingivr === true ) {
-
-				} else if ( data.isroutingivr === false ) {
-
+				if ( data.isroutingivr === false ) {
+					phone.notRoutingIvrState(true);
 				}
 			});
 
