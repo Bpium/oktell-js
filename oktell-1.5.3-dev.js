@@ -3114,7 +3114,7 @@ Oktell = (function(){
 				that.sip.on('RTCSessionStarted', function(){
 					that.sipHasRTCSession = true;
 					self.trigger('')
-					that.loadStates();
+//					that.loadStates();
 				});
 				that.sip.on('RTCSessionEnded', function(){
 					that.sipHasRTCSession = false;
@@ -3404,7 +3404,7 @@ Oktell = (function(){
 
 						if ( data.abonent ) {
 							if ( ! data.abonent.conferenceid ) {
-								that.setAbonent(data.abonent, oldState == that.states.TALK && that.sipHasRTCSession );
+								that.setAbonent(data.abonent, ( oldState == that.states.TALK && that.sipHasRTCSession ) || data.abonent.isivr );
 								that.conferenceId(false);
 								setStateFromResultData();
 								callCallback();
@@ -4834,6 +4834,14 @@ Oktell = (function(){
 
 			server.bindOktellEvent('phoneevent_ringstopped', function(data){
 				phone.loadStates();
+			});
+
+			server.bindOktellEvent('phoneevent_ivrstarted', function(data){
+				if ( data.isroutingivr === true ) {
+
+				} else if ( data.isroutingivr === false ) {
+
+				}
 			});
 
 			server.bindOktellEvent('phoneevent_commstarted', function(data){
