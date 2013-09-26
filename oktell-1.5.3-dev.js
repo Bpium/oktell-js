@@ -3413,7 +3413,6 @@ Oktell = (function(){
 						if ( data.abonent ) {
 							if ( ! data.abonent.conferenceid ) {
 								if ( size(that.abonentList) == 0 || that.notRoutingIvrState() ) {
-									log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SET ABONENT IN LOADSTATES', size(that.abonentList), that.notRoutingIvrState());
 									that.notRoutingIvrState(false);
 									that.setAbonent(data.abonent, ( oldState == that.states.TALK && that.sipHasRTCSession ) || data.abonent.isivr );
 								}
@@ -3513,7 +3512,6 @@ Oktell = (function(){
 			 * @return {*}
 			 */
 			setAbonent: function(data, saveOldAbonentIfEmpty) {
-				log('!!!!!!!!!!!!!!!!!!!!!!!!! SET ABONENT');
 				var oldKey;
 				if ( size(this.abonentList) ) {
 					each(this.abonentList, function(ab,key){
