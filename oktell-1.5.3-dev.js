@@ -1379,7 +1379,7 @@ Oktell = (function(){
 	 * @param onOpenCallback коллбэк
 	 * @constructor
 	 */
-	var Server = function( url, openTimeout, onOpenCallback ) {
+	var Server = function( url, openTimeout, delayMin, delayMax, onOpenCallback ) {
 		var ws,
 			wsArr = {},
 			wsUrlRegexp = /^ws[s]{0,1}:\/\/\S+$/i,
@@ -1397,6 +1397,8 @@ Oktell = (function(){
 				'dlgcard': ['dlgcard_showreserve', 'dlgcard_showconfirm', 'dlgcard_showformstop', 'dlgcard_showformdialog', 'dlgcard_closeall', 'dlgcard_closereserve', 'dlgcard_closeformreturnvalues', 'dlgcard_closeformreturncomment']
 			};
 
+		self.setQueryDelayMin(delayMin);
+		self.setQueryDelayMax(delayMax);
 
 		var parseUrls = function(urls){
 			if ( ! isArray(urls) ) {
@@ -1683,7 +1685,18 @@ Oktell = (function(){
 			if ( typeof callback == 'function' ) {
 				callbacks[id] = callback;
 			}
-			return ws.send( data );
+			if ( self.delayMin > 0 ) {
+				timeout = self.delayMin;
+				if ( delayMax ) {
+					timeout = Math.round( Math.random() * Math.abs(self.delayMax - self.delayMin) + self.delayMin );
+				}
+				setTimeout(function(){
+					ws.send(data);
+				}, timeout);
+				return true
+			} else {
+				return ws.send( data );
+			}
 		}
 
 		self.sendOktell = function ( method, body, callback ) {
@@ -1849,6 +1862,18 @@ Oktell = (function(){
 			return websocket ? websocket.readyState : undefined;
 		}
 	};
+	Server.prototype.setQueryDelayMin = function(delay){
+		delay = parseInt(delay);
+		if ( delay ) {
+			this.delayMin = delay;
+		}
+	};
+	Server.prototype.setQueryDelayMax = function(delay){
+		delay = parseInt(delay);
+		if ( delay ) {
+			this.delayMax = delay;
+		}
+	};
 	extend( Server.prototype , Events );
 
 	var Abonent = function() {
@@ -1863,7 +1888,13 @@ Oktell = (function(){
 			currentUrlIndex = 0,
 			pingTimer,
 			queueTimer,
-			oktellOptions,
+			oktellOptions = {
+				openTimeout: 10000,
+				queryTimeout: 20000,
+				queueInterval: 5000,
+				oktellVoice: false,
+				webSocketSwfLocation: "WebSocketMain.swf"
+			},
 			oktellVoice,
 			sipPhone,
 			sipPnoneActive = false,
@@ -4485,6 +4516,15 @@ Oktell = (function(){
 		};
 		exportApi('getPhoneActions',getPhoneActions);
 
+		startQueueTimer = function(timeout) {
+			clearInterval(queueTimer);
+			queueTimer = setInterval(function(){
+				if ( serverConnected() ) {
+					phone.queue()
+				}
+			}, timeout);
+		}
+
 		/**
 		 * connect with server
 		 * @param options
@@ -4494,14 +4534,6 @@ Oktell = (function(){
 		var connect = function( options, callback ) {
 
 			self.trigger('connecting');
-
-			oktellOptions = oktellOptions || {
-				openTimeout: 10000,
-				queryTimeout: 20000,
-				queueInterval: 5000,
-				oktellVoice: false,
-				webSocketSwfLocation: "WebSocketMain.swf"
-			};
 
 			if ( serverConnected() ) {
 				return true;
@@ -4590,7 +4622,7 @@ Oktell = (function(){
 			}
 
 			var createServer = function() {
-				server = new Server( oktellOptions.url, oktellOptions.openTimeout, function(url){
+				server = new Server( oktellOptions.url, oktellOptions.openTimeout, oktellOptions.queryDelayMin, oktellOptions.queryDelayMax, function(url){
 					//alert(url);
 					loginError = false;
 					oktellInfo.currentUrl = server.url; //oktellOptions.url[currentUrlIndex];
@@ -4629,12 +4661,7 @@ Oktell = (function(){
 									server.sendOktell('ping');
 								}
 							},15000);
-							clearInterval(queueTimer);
-							queueTimer = setInterval(function(){
-								if ( serverConnected() ) {
-									phone.queue()
-								}
-							}, oktellOptions.queueInterval)
+							startQueueTimer(oktellOptions.queueInterval);
 							phone.queue();
 							customEvents.sendCustomBinding();
 
@@ -5064,6 +5091,26 @@ Oktell = (function(){
 					}
 				});
 			}
+		}
+
+		self.config = function(config) {
+			if ( ! config ) { return false; }
+			if ( config.debugMode !== undefined ) {
+				debugMode = Boolean(config.debugMode);
+			}
+			if ( config.queryDelayMin !== undefined ) {
+				if ( server ) {	server.setQueryDelayMin(config.queryDelayMin); } else { oktellOptions.queryDelayMin = config.queryDelayMin; }
+			}
+			if ( config.queryDelayMax !== undefined ) {
+				if ( server ) {	server.setQueryDelayMax(config.queryDelayMax); } else { oktellOptions.queryDelayMax = config.queryDelayMax; }
+			}
+			if ( config.queueInterval !== undefined && parseInt(config.queueInterval) ) {
+				startQueueTimer(parseInt(config.queueInterval));
+			}
+			if ( config.queryTimeout !== undefined && parseInt(config.queryTimeout)  ) {
+				oktellOptions.queryTimeout = parseInt(config.queryTimeout);
+			}
+
 		}
 
 		self.version = '1.5.4';
