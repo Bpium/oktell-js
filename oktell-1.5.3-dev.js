@@ -1726,7 +1726,7 @@ Oktell = (function(){
 				} else {
 					items = false;
 				}
-				callFunc(callback,items);
+				callFunc(callback,items, data.dataset);
 			});
 		};
 
@@ -2089,7 +2089,11 @@ Oktell = (function(){
 			2601: 'bad flash mode',
 			2602: 'error while exec flash method',
 			// queue
-			2701: 'error while loading user queue'
+			2701: 'error while loading user queue',
+			// change pass
+			2801: 'wrong old password',
+			2802: 'incorrect new password',
+			2803: 'error while exec changepassword method on server'
 
 		};
 
@@ -2260,13 +2264,14 @@ Oktell = (function(){
 						inputparams: params || {}
 					};
 					log('>>>> ' + method, p);
-					server.execProc(method, p, function(items){
+					server.execProc(method, p, function(items, datasetRaw){
 						var resultdata = {
 							result: false
 						};
 						if ( items ) {
 							resultdata.result = true;
 							resultdata.datasets = items;
+							resultdata.datasetsRaw = datasetRaw;
 						}
 						log('<<<< ' + method, resultdata);
 						callFunc(callbackFn, getReturnObj(resultdata.result, resultdata, 1105, ' ' + method));
@@ -4572,7 +4577,6 @@ Oktell = (function(){
 
 			oktellInfo.url = oktellOptions.url;
 			oktellInfo.login = oktellOptions.login;
-			oktellInfo.password = oktellOptions.password;
 			oktellInfo.defaultAvatar = oktellOptions.defaultAvatar;
 			oktellInfo.defaultAvatar32x32 = oktellOptions.defaultAvatar32x32;
 			oktellInfo.defaultAvatar64x64 = oktellOptions.defaultAvatar64x64;
@@ -5042,6 +5046,24 @@ Oktell = (function(){
 
 		self.webphoneIsActive = function() {
 			return sipPnoneActive;
+		}
+
+		self.changePassword = function(newPass, oldPass, callback){
+			if ( ! (typeof newPass == 'string' && newPass) ) {
+				callFunc(callback, getErrorObj(2802));
+			} else {
+				newPass = md5(utf8DecodePass(newPass));
+				oldPass = md5(utf8DecodePass(oldPass));
+				self.exec('changepassword', { newpwdmd5: newPass, oldpwdmd5: oldPass }, function(data){
+					if ( data.result ) {
+						callFunc(callback, getSuccessObj({result: true}));
+					} else if ( data.errormsg == 'old password is wrong' ) {
+						callFunc(callback, getErrorObj(2801));
+					} else {
+						callFunc(callback, getErrorObj(2803));
+					}
+				});
+			}
 		}
 
 		self.version = '1.5.4';
