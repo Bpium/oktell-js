@@ -1,6 +1,6 @@
 {
   "name": "oktelljs",
-  "version": "0.1.1",
+  "version": "1.6.0",
 
   "authors": [
     "airato <airato.a@gmail.com>"
@@ -14,6 +14,9 @@
     "node_modules",
     "bower_components",
     "test",
-    "tests"
+    "**/*",
+    "!build/**/*",
+    "!bower.json",
+    "!README.md"
   ]
 }
