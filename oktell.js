@@ -4633,12 +4633,18 @@ Oktell = (function(){
 						expires: oktellOptions.expires || undefined
 					}, function(data){
 						loginError = true;
+						var getLoginErrorObj = function(code) {
+							return getErrorObj(errorCode, '', {
+								serverErrorMessage: data.errormsg,
+								serverErrorCode: data.error
+							});
+						}
 						if ( data.error || data.errormsg ) {
 							var errorCode = 1000;
 							if ( data.error == 50093 ) {
-								errorCode = 1204;
+								errorCode = 1204; // Пользователь уже зарегистрирован
 							} else if ( data.error == 50025 ) {
-								errorCode = 1214;
+								errorCode = 1214; // Количество пользователей, одновременно работающих с системой, ограничено лицензией
 							} else if( data.errormsg == "Wrong login/pass combination" ) {
 								cookie(cookieSessionName, null);
 								localStorage && (delete localStorage[cookieSessionName]);
@@ -4648,8 +4654,8 @@ Oktell = (function(){
 								localStorage && (delete localStorage[cookieSessionName]);
 								errorCode = 1212;
 							}
-							callFunc( oktellOptions.callback, getErrorObj(errorCode) );
-							self.trigger('connectError', getErrorObj(errorCode) );
+							callFunc( oktellOptions.callback, getLoginErrorObj(errorCode) );
+							self.trigger('connectError', getLoginErrorObj(errorCode) );
 							disconnect(14);
 						} else if (data.result == 1) {
 							clearInterval(pingTimer);
@@ -4756,8 +4762,8 @@ Oktell = (function(){
 
 																			self.trigger('connect');
 																		} else {
-																			callFunc( oktellOptions.callback, getErrorObj(1207) );
-																			self.trigger('connectError', getErrorObj(1207) );
+																			callFunc( oktellOptions.callback, getLoginErrorObj(1207) );
+																			self.trigger('connectError', getLoginErrorObj(1207) );
 																			disconnect(14);
 																		}
 																	});
@@ -4765,29 +4771,29 @@ Oktell = (function(){
 															});
 														});
 													} else {
-														callFunc( oktellOptions.callback, getErrorObj(1209) );
-														self.trigger('connectError', getErrorObj(1209) );
+														callFunc( oktellOptions.callback, getLoginErrorObj(1209) );
+														self.trigger('connectError', getLoginErrorObj(1209) );
 														disconnect(14);
 													}
 												});
 											});
 										} else {
-											callFunc( oktellOptions.callback, getErrorObj(1210) );
-											self.trigger('connectError', getErrorObj(1210) );
+											callFunc( oktellOptions.callback, getLoginErrorObj(1210) );
+											self.trigger('connectError', getLoginErrorObj(1210) );
 											disconnect(14);
 										}
 									});
 								} else {
-									callFunc( oktellOptions.callback, getErrorObj(1206 ) );
-									self.trigger('connectError', getErrorObj(1206) );
+									callFunc( oktellOptions.callback, getLoginErrorObj(1206 ) );
+									self.trigger('connectError', getLoginErrorObj(1206) );
 									disconnect(11);
 								}
 							});
 
 
 						} else {
-							callFunc( oktellOptions.callback, getErrorObj(1211) );
-							self.trigger('connectError', getErrorObj(1211) );
+							callFunc( oktellOptions.callback, getLoginErrorObj(1211) );
+							self.trigger('connectError', getLoginErrorObj(1211) );
 							disconnect(14);
 						}
 					});
