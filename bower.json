@@ -5,8 +5,8 @@
   "authors": [
     "airato <airato.a@gmail.com>"
   ],
-  "description": "Oktell.js libraries and plugins",
-  "main": "oktell-1.5.3.js",
+  "description": "Oktell.js",
+  "main": "oktell.js",
   "homepage": "https://git.oktell.ru/web/oktelljs",
   "private": true,
   "ignore": [

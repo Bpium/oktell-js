@@ -4665,7 +4665,7 @@ Oktell = (function(){
 								}
 							},15000);
 							startQueueTimer(oktellOptions.queueInterval);
-							phone.queuжe();
+							phone.queue();
 							customEvents.sendCustomBinding();
 
 							server.bindOktellEvent('userstatechanged', function(data){
