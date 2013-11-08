@@ -3117,6 +3117,7 @@ Oktell = (function(){
 			sipActive: false,
 			sipHasRTCSession: false,
 			_notRoutingIvrState: false,
+			currentSessionData: {},
 			states: {
 				DISCONNECTED: -1,
 				READY: 0,
@@ -3327,7 +3328,6 @@ Oktell = (function(){
 				newStateId = parseInt(newStateId);
 
 				if ( this.getStateStr(newStateId) && newStateId != this._stateId ) {
-
 //					var oldPhoneState = this.apiGetPhoneState(this._stateId);
 					var oldState = this.apiGetStateStr(this._stateId);
 					log('CHANGE STATE FROM ' + this.getStateStr(this._stateId) + ' TO ' + this.getStateStr(newStateId), this.getAbonents(true));
@@ -3394,9 +3394,14 @@ Oktell = (function(){
 			/**
 			 * Load phone state
 			 * @param callback
+			 * @params knownData some already known data (for example knownData.isAutoCall, knownData.sequence, etc)
+			 * possible properties for knownData
+			 * 		isAutoCall: boolean
 			 */
-			loadStates: function(callback) {
+			loadStates: function(callback, knownData) {
 				var that = this;
+				knownData = knownData || {};
+				extend(that.currentSessionData, knownData);
 				//that.loadFlashInfo(function(data){
 				if ( ! serverConnected() ) {
 					return false;
@@ -3407,29 +3412,37 @@ Oktell = (function(){
 						callFunc(callback,getReturnObj(data.result,data,1103,' getextendedlineinfo'));
 					}
 
+					log('getextendedlineinfo result and that.currentSessionData', data, that.currentSessionData);
+
 					if ( data.result ) {
 
 						var oldState = that.state();
 
 						var setStateFromResultData = function() {
-							if ( data.abonent.isautocall ) {
+							log('setStateFromResultData');
+							if ( that.currentSessionData.isAutoCall && ! data.abonent.isautocall && oldState == that.states.READY ) {
+								that.state( that.states.BACKRING );
+							} else if ( data.abonent.isautocall ) {
+								that.currentSessionData.isAutoCall = false;
 								that.state( that.states.BACKCALL );
 							} else if ( data.abonent.isringing ) {
-								if ( data.abonent.direction == 'acm_callback' ) {
+								if ( data.abonent.direction == 'acm_callback' || oldState == that.states.BACKRING ) {
 									that.state( that.states.BACKRING );
 								} else {
 									that.state( that.states.RING );
 								}
-							} else if ( data.abonent.iscommutated || data.abonent.iswaitinginflash || data.abonent.isconference || data.abonent.isivr ) {
+							} else if ( !( that.currentSessionData.isAutoCall ) && (data.abonent.iscommutated || data.abonent.iswaitinginflash || data.abonent.isconference || data.abonent.isivr) ) {
 								that.startTalkTimer(parseInt(data.timertalklensec) || 0);
 								that.state( that.states.TALK );
-							} else if ( data.abonent.extline || data.abonent.number ) { // peace of shit
+							} else if ( data.abonent.extline || data.abonent.number ) { //
+								that.currentSessionData.isAutoCall = false;
 								that.state( that.states.CALL );
 							} else if ( data.linestatestr == 'lsDisconnected' ) {
 								that.state( that.states.DISCONNECTED );
 							} else if ( oldState == that.states.TALK && that.sipHasRTCSession ) {
 
 							} else {
+								that.currentSessionData = {};
 								that.state( that.states.READY );
 //								if ( oldState !== that.state() && that.sipActive ) {
 //									that.sip.hangup();
@@ -3447,6 +3460,7 @@ Oktell = (function(){
 							if ( ! data.abonent.conferenceid ) {
 								if ( size(that.abonentList) == 0 || that.notRoutingIvrState() ) {
 									that.notRoutingIvrState(false);
+                                    data.abonent.chainId = data.chainid;
 									that.setAbonent(data.abonent, ( oldState == that.states.TALK && that.sipHasRTCSession ) || data.abonent.isivr );
 								}
 								that.conferenceId(false);
@@ -3510,6 +3524,8 @@ Oktell = (function(){
 						isConferenceGhostMajor: data.competitorid && data.isghostmajor ? true : undefined,
 						isConferenceHidden: data.competitorid && data.ishidden ? true : undefined,
 						isExternal: data.isextline ? true : false,
+
+                        chainId: data.chainId,
 
 						phone: data.number ? data.number.toString() : ( data.calledid ? data.callerid.toString() : undefined ),
 						phoneFormatted: data.number ? formatPhone( data.number.toString() ) : undefined,
@@ -3793,9 +3809,9 @@ Oktell = (function(){
 				params.number = number.toString();
 
 				sendOktell( 'pbxautocallstart', params, function( data ) {
-					that.loadStates(function(){
+//					that.loadStates(function(){
 						callFunc(callback,data);
-					});
+//					});
 				});
 			},
 
@@ -4870,7 +4886,8 @@ Oktell = (function(){
 			} else if ( stateId == 7 ) {
 				phone.state( phone.states.DISCONNECTED );
 			} else {
-				phone.state( phone.states.READY );
+				phone.loadStates();
+//				phone.state( phone.states.READY );
 			}
 		});
 
@@ -4887,7 +4904,10 @@ Oktell = (function(){
 			});
 
 			server.bindOktellEvent('phoneevent_acmcallstarted', function(data){
-				phone.loadStates();
+				phone.loadStates(null, {
+//					sequence: phone.state() == phone.states.READY ? '': null,
+					isAutoCall: true
+				});
 			});
 
 			server.bindOktellEvent('phoneevent_acmcallstopped', function(data){
