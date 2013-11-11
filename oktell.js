@@ -3203,9 +3203,7 @@ Oktell = (function(){
 			setHold: function( info ) {
 				if ( info !== undefined && ( ( info.userid && info.userid != this._holdNumber ) || ( info.number && info.number != this._holdNumber ) || ( info.conferenceid && info.conferenceid != this._holdNumber ) ) ) {
 
-					if ( this._holdAbonent ) {
-						self.trigger('holdAbobnentLeave', cloneObject(this._holdAbonent) );
-					}
+					var oldHoldAbonent = this._holdAbonent;
 
 					this._holdNumber = info.conferenceid ? info.conferenceid : ( info.userid ? info.userid : info.number );
 					this._holdAbonent = info.conferenceid ? {
@@ -3215,12 +3213,18 @@ Oktell = (function(){
 						conferenceRoom: info.conferenceroom
 					} : this.createAbonent(info);
 
-					self.trigger('holdAbobnentEnter', cloneObject(this._holdAbonent));
+					if ( oldHoldAbonent && ( oldHoldAbonent.key != this._holdAbonent.key ) || ( ! this._holdAbonent ) ) {
+						self.trigger('holdAbonentLeave', cloneObject(oldHoldAbonent) );
+					}
+
+					if ( !(oldHoldAbonent && this._holdAbonent && this._holdAbonent.key && oldHoldAbonent.key && this._holdAbonent.key == oldHoldAbonent.key ) ) {
+						self.trigger('holdAbonentEnter', cloneObject(this._holdAbonent));
+					}
 					self.trigger('holdStateChange', cloneObject(this.getHoldInfo()));
 					return true;
 				} else if ( info === false ) {
 					if ( this._holdAbonent ) {
-						self.trigger('holdAbobnentLeave', cloneObject(this._holdAbonent));
+						self.trigger('holdAbonentLeave', cloneObject(this._holdAbonent));
 					}
 					this._holdAbonent = undefined;
 					var oldHold = this._holdNumber;
@@ -3417,10 +3421,34 @@ Oktell = (function(){
 					if ( data.result ) {
 
 						var oldState = that.state();
+						var oldHoldInfo = that.getHoldInfo();
+						var oldAbonents = that.getAbonents(true);
+						var oldAb = oldAbonents && oldAbonents[0] || false;
 
 						var setStateFromResultData = function() {
 							log('setStateFromResultData');
-							if ( that.currentSessionData.isAutoCall && ! data.abonent.isautocall && oldState == that.states.READY ) {
+
+							// check if toggle called
+							var newHoldInfo = that.getHoldInfo();
+							var newAbonents = that.getAbonents(true);
+							var newAb = newAbonents && newAbonents[0] || false;
+
+							if ( newAb && oldAb && oldHoldInfo.hasHold && newHoldInfo.hasHold &&
+									( // curr ab is old hold
+										( newAb.conferenceId && oldHoldInfo.conferenceId && newAb.conferenceId == oldHoldInfo.conferenceId ) || // curr ab is conf and it is old hold
+										( ! newAb.conferenceId && oldHoldInfo.abonent && newAb.key == oldHoldInfo.abonent.key ) // or curr ab isnt conf and it is old hold
+									)
+									&&
+									( // old ab is curr hold
+										( oldAb.conferenceId && newHoldInfo.conferenceId && oldAb.conferenceId == newHoldInfo.conferenceId ) || // curr ab is conf and it is old hold
+										( ! oldAb.conferenceId && newHoldInfo.abonent && oldAb.key == newHoldInfo.abonent.key ) // or curr ab isnt conf and it is old hold
+									)
+								) {
+
+								log('toggle was called');
+//								that.state( that.states.READY );
+
+							} else if ( that.currentSessionData.isAutoCall && ! data.abonent.isautocall && oldState == that.states.READY ) {
 								that.state( that.states.BACKRING );
 							} else if ( data.abonent.isautocall ) {
 								that.currentSessionData.isAutoCall = false;
@@ -3431,7 +3459,7 @@ Oktell = (function(){
 								} else {
 									that.state( that.states.RING );
 								}
-							} else if ( !( that.currentSessionData.isAutoCall ) && (data.abonent.iscommutated || data.abonent.iswaitinginflash || data.abonent.isconference || data.abonent.isivr) ) {
+							} else if ( !( that.currentSessionData.isAutoCall ) && (data.abonent.iscommutated || data.abonent.iswaitinginflash || data.abonent.isconference ) ) {  // || data.abonent.isivr) ) {
 								that.startTalkTimer(parseInt(data.timertalklensec) || 0);
 								that.state( that.states.TALK );
 							} else if ( data.abonent.extline || data.abonent.number ) { //
@@ -3458,11 +3486,13 @@ Oktell = (function(){
 
 						if ( data.abonent ) {
 							if ( ! data.abonent.conferenceid ) {
-								if ( size(that.abonentList) == 0 || that.notRoutingIvrState() ) {
-									that.notRoutingIvrState(false);
+//								log('			start set abonent', that.abonentList, data.abonent, that.notRoutingIvrState());
+//								if ( oldHoldInfo.hasHold != that.getHoldInfo().hasHold || size(that.abonentList) == 0 || that.notRoutingIvrState() ) {
+//									that.notRoutingIvrState(false);
                                     data.abonent.chainId = data.chainid;
+//									log('			set abonent');
 									that.setAbonent(data.abonent, ( oldState == that.states.TALK && that.sipHasRTCSession ) || data.abonent.isivr );
-								}
+//								}
 								that.conferenceId(false);
 								setStateFromResultData();
 								callCallback();
@@ -4929,6 +4959,8 @@ Oktell = (function(){
 			server.bindOktellEvent('phoneevent_ivrstarted', function(data){
 				if ( data.isroutingivr === false ) {
 					phone.notRoutingIvrState(true);
+				} else if ( data.isroutingivr === true && phone.state() == phone.states.READY ) {
+					phone.loadStates();
 				}
 			});
 
@@ -4949,14 +4981,20 @@ Oktell = (function(){
 						});
 					});
 				} else {
-					phone.loadStates();
+					setTimeout(function(){
+						phone.loadStates(function(){}, {
+							commStarted: true
+						});
+					}, 700);
 				}
 			});
 
 			server.bindOktellEvent('phoneevent_commstopped', function(data){
 				phone.clearTalkTimer();
 				setTimeout(function(){
-					phone.loadStates(function(){});
+					phone.loadStates(function(){}, {
+						commStopped: true
+					});
 				}, 700);
 			});
 
