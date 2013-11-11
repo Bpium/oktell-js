@@ -3328,30 +3328,36 @@ Oktell = (function(){
 			 * @param newStateId
 			 * @return {*} current state id
 			 */
-			state: function( newStateId ) {
+			state: function( newStateId, oldAbonents ) {
 				newStateId = parseInt(newStateId);
 
 				if ( this.getStateStr(newStateId) && newStateId != this._stateId ) {
 //					var oldPhoneState = this.apiGetPhoneState(this._stateId);
 					var oldState = this.apiGetStateStr(this._stateId);
 					log('CHANGE STATE FROM ' + this.getStateStr(this._stateId) + ' TO ' + this.getStateStr(newStateId), this.getAbonents(true));
+
+					var abonents = this.getAbonents(true);
+					if ( abonents.length == 0 ) {
+						abonents = oldAbonents;
+					}
+
 					switch ( this._stateId ) {
-						case this.states.RING: self.trigger('ringStop', this.getAbonents(true)); break;
-						case this.states.BACKRING: self.trigger('backRingStop', this.getAbonents(true)); break;
-						case this.states.CALL: self.trigger('callStop', this.getAbonents(true) ); break;
-						case this.states.BACKCALL: self.trigger('callStop', this.getAbonents(true)); break;
-						case this.states.TALK: self.trigger('talkStop', this.getAbonents(true)); break;
+						case this.states.RING: self.trigger('ringStop', abonents); break;
+						case this.states.BACKRING: self.trigger('backRingStop', abonents); break;
+						case this.states.CALL: self.trigger('callStop', abonents); break;
+						case this.states.BACKCALL: self.trigger('callStop', abonents); break;
+						case this.states.TALK: self.trigger('talkStop', abonents); break;
 					}
 
 					this._stateId = newStateId;
 
 					switch ( this._stateId ) {
-						case this.states.RING: self.trigger('ringStart', this.getAbonents(true)); break;
-						case this.states.BACKRING: self.trigger('backRingStart', this.getAbonents(true)); break;
-						case this.states.CALL: self.trigger('callStart', this.getAbonents(true)); break;
-						case this.states.BACKCALL: self.trigger('callStart', this.getAbonents(true)); break;
-						case this.states.TALK: self.trigger('talkStart', this.getAbonents(true)); break;
-						//case this.states.CALLWEBPHONE: self.trigger('webphoneCallStart', this.getAbonents(true)); break;
+						case this.states.RING: self.trigger('ringStart', abonents); break;
+						case this.states.BACKRING: self.trigger('backRingStart', abonents); break;
+						case this.states.CALL: self.trigger('callStart',abonents); break;
+						case this.states.BACKCALL: self.trigger('callStart', abonents); break;
+						case this.states.TALK: self.trigger('talkStart', abonents); break;
+						//case this.states.CALLWEBPHONE: self.trigger('webphoneCallStart', abonents); break;
 					}
 
 //					var newPhoneState = this.apiGetPhoneState(this._stateId);
@@ -3449,29 +3455,29 @@ Oktell = (function(){
 //								that.state( that.states.READY );
 
 							} else if ( that.currentSessionData.isAutoCall && ! data.abonent.isautocall && oldState == that.states.READY ) {
-								that.state( that.states.BACKRING );
+								that.state( that.states.BACKRING, oldAbonents );
 							} else if ( data.abonent.isautocall ) {
 								that.currentSessionData.isAutoCall = false;
-								that.state( that.states.BACKCALL );
+								that.state( that.states.BACKCALL, oldAbonents );
 							} else if ( data.abonent.isringing ) {
 								if ( data.abonent.direction == 'acm_callback' || oldState == that.states.BACKRING ) {
-									that.state( that.states.BACKRING );
+									that.state( that.states.BACKRING, oldAbonents );
 								} else {
-									that.state( that.states.RING );
+									that.state( that.states.RING, oldAbonents );
 								}
 							} else if ( !( that.currentSessionData.isAutoCall ) && (data.abonent.iscommutated || data.abonent.iswaitinginflash || data.abonent.isconference ) ) {  // || data.abonent.isivr) ) {
 								that.startTalkTimer(parseInt(data.timertalklensec) || 0);
-								that.state( that.states.TALK );
+								that.state( that.states.TALK, oldAbonents );
 							} else if ( data.abonent.extline || data.abonent.number ) { //
 								that.currentSessionData.isAutoCall = false;
-								that.state( that.states.CALL );
+								that.state( that.states.CALL, oldAbonents );
 							} else if ( data.linestatestr == 'lsDisconnected' ) {
 								that.state( that.states.DISCONNECTED );
 							} else if ( oldState == that.states.TALK && that.sipHasRTCSession ) {
 
 							} else {
 								that.currentSessionData = {};
-								that.state( that.states.READY );
+								that.state( that.states.READY, oldAbonents );
 //								if ( oldState !== that.state() && that.sipActive ) {
 //									that.sip.hangup();
 //								}
