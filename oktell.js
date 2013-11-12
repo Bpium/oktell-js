@@ -3332,24 +3332,38 @@ Oktell = (function(){
 				newStateId = parseInt(newStateId);
 
 				if ( this.getStateStr(newStateId) && newStateId != this._stateId ) {
-//					var oldPhoneState = this.apiGetPhoneState(this._stateId);
-					var oldState = this.apiGetStateStr(this._stateId);
+
+					var newState = this.apiGetStateStr(newStateId);
+					var oldStateId = this._stateId;
+					var oldState = this.apiGetStateStr(oldStateId);
+
 					log('CHANGE STATE FROM ' + this.getStateStr(this._stateId) + ' TO ' + this.getStateStr(newStateId), this.getAbonents(true));
+
+					this._stateId = newStateId;
+
+					if ( newStateId === this.states.READY || newStateId === this.states.DISCONNECTED ) {
+						this.removeAbonents();
+						this.conferenceId(false);
+						this.isConfCreator(false);
+						if ( newStateId === this.states.DISCONNECTED ) {
+							this.clearHold();
+						}
+					}
+
+					self.trigger('stateChange', newState, oldState );
 
 					var abonents = this.getAbonents(true);
 					if ( abonents.length == 0 ) {
 						abonents = oldAbonents;
 					}
 
-					switch ( this._stateId ) {
+					switch ( oldStateId ) {
 						case this.states.RING: self.trigger('ringStop', abonents); break;
 						case this.states.BACKRING: self.trigger('backRingStop', abonents); break;
 						case this.states.CALL: self.trigger('callStop', abonents); break;
 						case this.states.BACKCALL: self.trigger('callStop', abonents); break;
 						case this.states.TALK: self.trigger('talkStop', abonents); break;
 					}
-
-					this._stateId = newStateId;
 
 					switch ( this._stateId ) {
 						case this.states.RING: self.trigger('ringStart', abonents); break;
@@ -3360,24 +3374,7 @@ Oktell = (function(){
 						//case this.states.CALLWEBPHONE: self.trigger('webphoneCallStart', abonents); break;
 					}
 
-//					var newPhoneState = this.apiGetPhoneState(this._stateId);
-					var newState = this.apiGetStateStr(this._stateId);
-//					if ( newPhoneState != oldPhoneState ) {
-//						self.trigger('phoneStateChange', newPhoneState, oldPhoneState );
-//
-//					}
-					if ( newState != oldState ) {
-						self.trigger('stateChange', newState, oldState );
-					}
-				}
 
-				if ( newStateId === this.states.READY || newStateId === this.states.DISCONNECTED ) {
-					this.removeAbonents();
-					this.conferenceId(false);
-					this.isConfCreator(false);
-					if ( newStateId === this.states.DISCONNECTED ) {
-						this.clearHold();
-					}
 				}
 
 				return this._stateId;
@@ -3492,13 +3489,8 @@ Oktell = (function(){
 
 						if ( data.abonent ) {
 							if ( ! data.abonent.conferenceid ) {
-//								log('			start set abonent', that.abonentList, data.abonent, that.notRoutingIvrState());
-//								if ( oldHoldInfo.hasHold != that.getHoldInfo().hasHold || size(that.abonentList) == 0 || that.notRoutingIvrState() ) {
-//									that.notRoutingIvrState(false);
-                                    data.abonent.chainId = data.chainid;
-//									log('			set abonent');
-									that.setAbonent(data.abonent, ( oldState == that.states.TALK && that.sipHasRTCSession ) || data.abonent.isivr );
-//								}
+								data.abonent.chainId = data.chainid;
+								that.setAbonent( data.abonent, ( oldState == that.states.TALK && that.sipHasRTCSession ) || data.abonent.isivr || that.currentSessionData.isAutoCall );
 								that.conferenceId(false);
 								setStateFromResultData();
 								callCallback();

@@ -5,7 +5,8 @@ module.exports = function(grunt) {
   require('time-grunt')(grunt);
   myConf = {
     build: 'build',
-    version: '1.6.0'
+    version: '1.6.0',
+    chromePath: 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'
   };
   grunt.initConfig({
     myConf: myConf,
@@ -49,6 +50,15 @@ module.exports = function(grunt) {
             to: '"version": "<%= myConf.version %>",'
           }
         ]
+      }
+    },
+    karma: {
+      options: {
+        configFile: 'karma.conf.js'
+      },
+      first: {
+        singleRun: true,
+        browsers: ['<%= myConf.chromePath %>']
       }
     }
   });

@@ -5,6 +5,7 @@ module.exports = (grunt)->
 	myConf =
 		build: 'build'
 		version: '1.6.0'
+		chromePath: 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'
 
 	grunt.initConfig
 		myConf: myConf
@@ -62,6 +63,14 @@ module.exports = (grunt)->
 					from: /"version": "[0-9\.]+",/,
 					to: '"version": "<%= myConf.version %>",'
 				}]
+
+		karma:
+			options:
+				configFile: 'karma.conf.js'
+			first:
+#				runnerPort: 9999
+				singleRun: true,
+				browsers: ['<%= myConf.chromePath %>']
 
 
 
