@@ -4380,7 +4380,11 @@ Oktell = (function(){
 			},
 
 			hold: function() {
-				if ( this.sipActive ) { this.sip.hold(); }
+				if ( this.sipActive ) {
+					this.sip.hold();
+				} else if ( this.state() == this.states.TALK || this.getHoldInfo().hasHold ) {
+					this.makeFlash('switch');
+				}
 			},
 
 			resume: function() {
