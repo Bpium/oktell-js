@@ -3784,24 +3784,24 @@ Oktell = (function(){
 					var user = users[number];
 					var numberObj = numbers[number] || numbersById[number];
 //					if ( ! user && numberObj ) {
-////						each(users, function(u){
-////							if ( u.numberObj == numberObj || u.number == number ) {
-////								user = u;
-////								return breaker;
-////							}
-////						});
+//						each(users, function(u){
+//							if ( u.numberObj == numberObj || u.number == number ) {
+//								user = u;
+//								return breaker;
+//							}
+//						});
 //					}
 
-					if ( user ) {
-						log('setAbonent with user');
-						that.setAbonent(user);
-					} else if ( numberObj ) {
-						log('setAbonent with numberObj');
-						that.setAbonent(numberObj);
-					} else {
-						log('setAbonent with number');
-						that.setAbonent({number:number});
-					}
+//					if ( user ) {
+//						log('setAbonent with user');
+//						that.setAbonent(user);
+//					} else if ( numberObj ) {
+//						log('setAbonent with numberObj');
+//						that.setAbonent(numberObj);
+//					} else {
+//						log('setAbonent with number');
+//						that.setAbonent({number:number});
+//					}
 					callFunc(callback, getSuccessObj());
 				} else if ( that.state() == that.states.READY || that.state() == that.states.TALK ) {
 					// обратный вызов
@@ -4039,25 +4039,37 @@ Oktell = (function(){
 			endCall: function( numbers ) {
 				var that = this;
 				numbers = toStringsArray(numbers);
+				var isAbonent = false;
+				var isMe = false;
+				if ( numbers ) {
+					each(numbers, function(n){
+						if ( ! isAbonent && that.isAbonent(n) ) {
+							isAbonent = true;
+						}
+						if ( ! isMe && ( n == oktellInfo.number || n == oktellInfo.userid ) ) {
+							isMe = true;
+						}
+					});
+				}
 
-				if ( that.getHoldInfo().hasHold ) {
+				if ( ! numbers ) {
+					if ( that.state() == that.states.TALK || that.state() == that.states.CALL || that.getHoldInfo().hasHold ) {
+						that.abortCall();
+					} else if ( that.state() == that.states.BACKCALL ) {
+						that.abortAcmCall();
+					} else if ( that.state() == that.states.RING || that.state() == that.states.BACKRING ) {
+						that.declineCall();
+					}
+				} else if ( that.getHoldInfo().hasHold && ( ( that.conferenceId() && isMe ) || ( ! that.conferenceId() && isAbonent ) ) ) {
 					that.makeFlash('abort');
 				} else {
 					if ( that.state() == that.states.TALK ) {
 						if ( that.conferenceId() ) {
-							if ( numbers ) {
-								// kick numbers from conf
-								that.kickConfAbonent( that.conferenceId(), numbers);
-							} else {
-								// end conf
-								that.exitConf(that.conferenceId());
-							}
+							that.kickConfAbonent( that.conferenceId(), numbers);
 						} else {
-							// abort call
 							that.abortCall();
 						}
 					} else if ( that.state() == that.states.BACKCALL ) {
-						// abort acm call
 						that.abortAcmCall();
 					} else if ( that.state() == that.states.CALL ) {
 						that.abortCall();
