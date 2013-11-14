@@ -3328,10 +3328,10 @@ Oktell = (function(){
 			 * @param newStateId
 			 * @return {*} current state id
 			 */
-			state: function( newStateId, oldAbonents ) {
+			state: function( newStateId, oldAbonents, fireEventAnyway ) {
 				newStateId = parseInt(newStateId);
 
-				if ( this.getStateStr(newStateId) && newStateId != this._stateId ) {
+				if ( this.getStateStr(newStateId) && ( fireEventAnyway || newStateId != this._stateId ) ) {
 
 					var newState = this.apiGetStateStr(newStateId);
 					var oldStateId = this._stateId;
@@ -3357,12 +3357,14 @@ Oktell = (function(){
 						abonents = oldAbonents;
 					}
 
+					var abonentsForTalkStop = newStateId == this.states.TALK && oldStateId == this.states.TALK ? oldAbonents : abonents;
+
 					switch ( oldStateId ) {
 						case this.states.RING: self.trigger('ringStop', abonents); break;
 						case this.states.BACKRING: self.trigger('backRingStop', abonents); break;
 						case this.states.CALL: self.trigger('callStop', abonents); break;
 						case this.states.BACKCALL: self.trigger('callStop', abonents); break;
-						case this.states.TALK: self.trigger('talkStop', abonents); break;
+						case this.states.TALK: self.trigger('talkStop', abonentsForTalkStop); break;
 					}
 
 					switch ( this._stateId ) {
@@ -3436,7 +3438,7 @@ Oktell = (function(){
 							var newAbonents = that.getAbonents(true);
 							var newAb = newAbonents && newAbonents[0] || false;
 
-							if ( newAb && oldAb && oldHoldInfo.hasHold && newHoldInfo.hasHold &&
+							/*if ( newAb && oldAb && oldHoldInfo.hasHold && newHoldInfo.hasHold &&
 									( // curr ab is old hold
 										( newAb.conferenceId && oldHoldInfo.conferenceId && newAb.conferenceId == oldHoldInfo.conferenceId ) || // curr ab is conf and it is old hold
 										( ! newAb.conferenceId && oldHoldInfo.abonent && newAb.key == oldHoldInfo.abonent.key ) // or curr ab isnt conf and it is old hold
@@ -3449,9 +3451,8 @@ Oktell = (function(){
 								) {
 
 								log('toggle was called');
-//								that.state( that.states.READY );
 
-							} else if ( that.currentSessionData.isAutoCall && ! data.abonent.isautocall && oldState == that.states.READY ) {
+							} else*/ if ( that.currentSessionData.isAutoCall && ! data.abonent.isautocall && oldState == that.states.READY ) {
 								that.state( that.states.BACKRING, oldAbonents );
 							} else if ( data.abonent.isautocall ) {
 								that.currentSessionData.isAutoCall = false;
@@ -3464,7 +3465,9 @@ Oktell = (function(){
 								}
 							} else if ( !( that.currentSessionData.isAutoCall ) && (data.abonent.iscommutated || data.abonent.iswaitinginflash || data.abonent.isconference ) ) {  // || data.abonent.isivr) ) {
 								that.startTalkTimer(parseInt(data.timertalklensec) || 0);
-								that.state( that.states.TALK, oldAbonents );
+								var newTalkStarted = that.currentSessionData.commStopped;
+								that.currentSessionData.commStopped = false;
+								that.state( that.states.TALK, oldAbonents, newTalkStarted );
 							} else if ( data.abonent.extline || data.abonent.number ) { //
 								that.currentSessionData.isAutoCall = false;
 								that.state( that.states.CALL, oldAbonents );
