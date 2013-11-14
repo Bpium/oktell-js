@@ -4065,7 +4065,7 @@ Oktell = (function(){
 					}
 				} else if ( that.getHoldInfo().hasHold && ( ( that.conferenceId() && isMe ) || ( ! that.conferenceId() && isAbonent ) ) ) {
 					that.makeFlash('abort');
-				} else {
+				} else if ( isAbonent || (that.conferenceId() && isMe) ) {
 					if ( that.state() == that.states.TALK ) {
 						if ( that.conferenceId() ) {
 							that.kickConfAbonent( that.conferenceId(), numbers);
