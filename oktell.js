@@ -3125,7 +3125,7 @@ Oktell = (function(){
 				CALL: 2,
 				RING: 3,
 				BACKRING: 4,
-				TALK: 5,
+				TALK: 5
 				//CALLWEBPHONE: 6
 			},
 
