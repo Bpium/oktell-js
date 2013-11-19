@@ -3201,6 +3201,7 @@ Oktell = (function(){
 			 * @return {Boolean} успех
 			 */
 			setHold: function( info ) {
+				var oldHoldInfo = this.getHoldInfo();
 				if ( info !== undefined && ( ( info.userid && info.userid != this._holdNumber ) || ( info.number && info.number != this._holdNumber ) || ( info.conferenceid && info.conferenceid != this._holdNumber ) ) ) {
 
 					var oldHoldAbonent = this._holdAbonent;
@@ -3220,7 +3221,10 @@ Oktell = (function(){
 					if ( !(oldHoldAbonent && this._holdAbonent && this._holdAbonent.key && oldHoldAbonent.key && this._holdAbonent.key == oldHoldAbonent.key ) ) {
 						self.trigger('holdAbonentEnter', cloneObject(this._holdAbonent));
 					}
-					self.trigger('holdStateChange', cloneObject(this.getHoldInfo()));
+					var newHoldInfo = this.getHoldInfo();
+					if ( oldHoldInfo.hasHold != newHoldInfo.hasHold ) {
+						self.trigger('holdStateChange', cloneObject(newHoldInfo));
+					}
 					return true;
 				} else if ( info === false ) {
 					if ( this._holdAbonent ) {
@@ -3357,17 +3361,19 @@ Oktell = (function(){
 						abonents = oldAbonents;
 					}
 
-					var abonentsForTalkStop = newStateId == this.states.TALK && oldStateId == this.states.TALK ? oldAbonents : abonents;
+//					var abonentsForTalkStop = newStateId == this.states.TALK && oldStateId == this.states.TALK ? oldAbonents : abonents;
 
 					switch ( oldStateId ) {
-						case this.states.RING: self.trigger('ringStop', abonents); break;
-						case this.states.BACKRING: self.trigger('backRingStop', abonents); break;
-						case this.states.CALL: self.trigger('callStop', abonents); break;
-						case this.states.BACKCALL: self.trigger('callStop', abonents); break;
-						case this.states.TALK: self.trigger('talkStop', abonentsForTalkStop); break;
+						case this.states.READY: self.trigger('readyStop', oldAbonents); break;
+						case this.states.RING: self.trigger('ringStop', oldAbonents); break;
+						case this.states.BACKRING: self.trigger('backRingStop', oldAbonents); break;
+						case this.states.CALL: self.trigger('callStop', oldAbonents); break;
+						case this.states.BACKCALL: self.trigger('callStop', oldAbonents); break;
+						case this.states.TALK: self.trigger('talkStop', oldAbonents); break;
 					}
 
 					switch ( this._stateId ) {
+						case this.states.READY: self.trigger('readyStart', abonents); break;
 						case this.states.RING: self.trigger('ringStart', abonents); break;
 						case this.states.BACKRING: self.trigger('backRingStart', abonents); break;
 						case this.states.CALL: self.trigger('callStart',abonents); break;
@@ -4063,9 +4069,9 @@ Oktell = (function(){
 					} else if ( that.state() == that.states.RING || that.state() == that.states.BACKRING ) {
 						that.declineCall();
 					}
-				} else if ( that.getHoldInfo().hasHold && ( ( that.conferenceId() && isMe ) || ( ! that.conferenceId() && isAbonent ) ) ) {
+				} else if ( that.getHoldInfo().hasHold && ( isMe || ( ! that.conferenceId() && isAbonent ) ) ) {
 					that.makeFlash('abort');
-				} else if ( isAbonent || (that.conferenceId() && isMe) ) {
+				} else if ( isAbonent || isMe ) {
 					if ( that.state() == that.states.TALK ) {
 						if ( that.conferenceId() ) {
 							that.kickConfAbonent( that.conferenceId(), numbers);
@@ -4547,7 +4553,7 @@ Oktell = (function(){
 						a.push('ghostListen', 'ghostHelp', 'ghostConference');
 					}
 				} else if ( abonent ) {
-					if ( phoneState == phone.states.RING ) {
+					if ( phone.sipActive && phoneState == phone.states.RING ) {
 						a.push('answer');
 					}
 					if ( isConf ) {
@@ -4943,6 +4949,18 @@ Oktell = (function(){
 		 */
 		events.on('login', function(){
 
+			server.bindOktellEvent('linestatechanged', function(data){
+				setTimeout(function(){
+					phone.loadStates();
+				}, 500);
+			});
+
+			server.bindOktellEvent('flashstatechanged', function(data){
+				setTimeout(function(){
+					phone.loadStates();
+				}, 500);
+			});
+
 			server.bindOktellEvent('confcompositionchanged', function(data){
 				if ( data.eventinfo.conferenceid == phone.conferenceId() ) {
 					phone.setConfAbonentList(data.eventinfo.competitorlist);
@@ -4958,7 +4976,9 @@ Oktell = (function(){
 			});
 
 			server.bindOktellEvent('phoneevent_acmcallstopped', function(data){
-				phone.loadStates();
+				setTimeout(function(){
+					phone.loadStates();
+				}, 700);
 			});
 
 			server.bindOktellEvent('phoneevent_ringstarted', function(data){

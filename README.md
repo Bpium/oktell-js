@@ -49,6 +49,12 @@
 	5. backring
 	6. talk
 
+2. Callcenter
+	1. true
+	2. false
+
+3. 
+
 2. phone actions - массив из след элементов
 	1. call
 	2. conference
