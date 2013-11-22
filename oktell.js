@@ -3214,15 +3214,18 @@ Oktell = (function(){
 						conferenceRoom: info.conferenceroom
 					} : this.createAbonent(info);
 
+					var holdAbonentChange = false;
 					if ( oldHoldAbonent && ( oldHoldAbonent.key != this._holdAbonent.key ) || ( ! this._holdAbonent ) ) {
+						holdAbonentChange = true;
 						self.trigger('holdAbonentLeave', cloneObject(oldHoldAbonent) );
 					}
 
 					if ( !(oldHoldAbonent && this._holdAbonent && this._holdAbonent.key && oldHoldAbonent.key && this._holdAbonent.key == oldHoldAbonent.key ) ) {
+						holdAbonentChange = true;
 						self.trigger('holdAbonentEnter', cloneObject(this._holdAbonent));
 					}
 					var newHoldInfo = this.getHoldInfo();
-					if ( oldHoldInfo.hasHold != newHoldInfo.hasHold ) {
+					if ( oldHoldInfo.hasHold != newHoldInfo.hasHold || holdAbonentChange ) {
 						self.trigger('holdStateChange', cloneObject(newHoldInfo));
 					}
 					return true;
