@@ -3484,7 +3484,7 @@ Oktell = (function(){
 								that.state( that.states.DISCONNECTED );
 							} else if ( oldState == that.states.TALK && that.sipHasRTCSession ) {
 
-							} else {
+							} else if ( data.linestatestr != 'lsReserved' ) {
 								that.currentSessionData = {};
 								that.state( that.states.READY, oldAbonents );
 //								if ( oldState !== that.state() && that.sipActive ) {
