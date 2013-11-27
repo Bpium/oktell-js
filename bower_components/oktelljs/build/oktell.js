@@ -3123,7 +3123,6 @@ Oktell = (function(){
 			sipActive: false,
 			sipHasRTCSession: false,
 			_notRoutingIvrState: false,
-			currentSessionData: {},
 			states: {
 				DISCONNECTED: -1,
 				READY: 0,
@@ -3131,7 +3130,7 @@ Oktell = (function(){
 				CALL: 2,
 				RING: 3,
 				BACKRING: 4,
-				TALK: 5
+				TALK: 5,
 				//CALLWEBPHONE: 6
 			},
 
@@ -3207,10 +3206,11 @@ Oktell = (function(){
 			 * @return {Boolean} успех
 			 */
 			setHold: function( info ) {
-				var oldHoldInfo = this.getHoldInfo();
 				if ( info !== undefined && ( ( info.userid && info.userid != this._holdNumber ) || ( info.number && info.number != this._holdNumber ) || ( info.conferenceid && info.conferenceid != this._holdNumber ) ) ) {
 
-					var oldHoldAbonent = this._holdAbonent;
+					if ( this._holdAbonent ) {
+						self.trigger('holdAbobnentLeave', cloneObject(this._holdAbonent) );
+					}
 
 					this._holdNumber = info.conferenceid ? info.conferenceid : ( info.userid ? info.userid : info.number );
 					this._holdAbonent = info.conferenceid ? {
@@ -3220,24 +3220,12 @@ Oktell = (function(){
 						conferenceRoom: info.conferenceroom
 					} : this.createAbonent(info);
 
-					var holdAbonentChange = false;
-					if ( oldHoldAbonent && ( oldHoldAbonent.key != this._holdAbonent.key ) || ( ! this._holdAbonent ) ) {
-						holdAbonentChange = true;
-						self.trigger('holdAbonentLeave', cloneObject(oldHoldAbonent) );
-					}
-
-					if ( !(oldHoldAbonent && this._holdAbonent && this._holdAbonent.key && oldHoldAbonent.key && this._holdAbonent.key == oldHoldAbonent.key ) ) {
-						holdAbonentChange = true;
-						self.trigger('holdAbonentEnter', cloneObject(this._holdAbonent));
-					}
-					var newHoldInfo = this.getHoldInfo();
-					if ( oldHoldInfo.hasHold != newHoldInfo.hasHold || holdAbonentChange ) {
-						self.trigger('holdStateChange', cloneObject(newHoldInfo));
-					}
+					self.trigger('holdAbobnentEnter', cloneObject(this._holdAbonent));
+					self.trigger('holdStateChange', cloneObject(this.getHoldInfo()));
 					return true;
 				} else if ( info === false ) {
 					if ( this._holdAbonent ) {
-						self.trigger('holdAbonentLeave', cloneObject(this._holdAbonent));
+						self.trigger('holdAbobnentLeave', cloneObject(this._holdAbonent));
 					}
 					this._holdAbonent = undefined;
 					var oldHold = this._holdNumber;
@@ -3341,57 +3329,51 @@ Oktell = (function(){
 			 * @param newStateId
 			 * @return {*} current state id
 			 */
-			state: function( newStateId, oldAbonents, fireEventAnyway ) {
+			state: function( newStateId ) {
 				newStateId = parseInt(newStateId);
 
-				if ( this.getStateStr(newStateId) && ( fireEventAnyway || newStateId != this._stateId ) ) {
+				if ( this.getStateStr(newStateId) && newStateId != this._stateId ) {
 
-					var newState = this.apiGetStateStr(newStateId);
-					var oldStateId = this._stateId;
-					var oldState = this.apiGetStateStr(oldStateId);
-
+//					var oldPhoneState = this.apiGetPhoneState(this._stateId);
+					var oldState = this.apiGetStateStr(this._stateId);
 					log('CHANGE STATE FROM ' + this.getStateStr(this._stateId) + ' TO ' + this.getStateStr(newStateId), this.getAbonents(true));
+					switch ( this._stateId ) {
+						case this.states.RING: self.trigger('ringStop', this.getAbonents(true)); break;
+						case this.states.BACKRING: self.trigger('backRingStop', this.getAbonents(true)); break;
+						case this.states.CALL: self.trigger('callStop', this.getAbonents(true) ); break;
+						case this.states.BACKCALL: self.trigger('callStop', this.getAbonents(true)); break;
+						case this.states.TALK: self.trigger('talkStop', this.getAbonents(true)); break;
+					}
 
 					this._stateId = newStateId;
 
-					if ( newStateId === this.states.READY || newStateId === this.states.DISCONNECTED ) {
-						this.removeAbonents();
-						this.conferenceId(false);
-						this.isConfCreator(false);
-						if ( newStateId === this.states.DISCONNECTED ) {
-							this.clearHold();
-						}
-					}
-
-					self.trigger('stateChange', newState, oldState );
-
-					var abonents = this.getAbonents(true);
-					if ( abonents.length == 0 ) {
-						abonents = oldAbonents;
-					}
-
-//					var abonentsForTalkStop = newStateId == this.states.TALK && oldStateId == this.states.TALK ? oldAbonents : abonents;
-
-					switch ( oldStateId ) {
-						case this.states.READY: self.trigger('readyStop', oldAbonents); break;
-						case this.states.RING: self.trigger('ringStop', oldAbonents); break;
-						case this.states.BACKRING: self.trigger('backRingStop', oldAbonents); break;
-						case this.states.CALL: self.trigger('callStop', oldAbonents); break;
-						case this.states.BACKCALL: self.trigger('callStop', oldAbonents); break;
-						case this.states.TALK: self.trigger('talkStop', oldAbonents); break;
-					}
-
 					switch ( this._stateId ) {
-						case this.states.READY: self.trigger('readyStart', abonents); break;
-						case this.states.RING: self.trigger('ringStart', abonents); break;
-						case this.states.BACKRING: self.trigger('backRingStart', abonents); break;
-						case this.states.CALL: self.trigger('callStart',abonents); break;
-						case this.states.BACKCALL: self.trigger('callStart', abonents); break;
-						case this.states.TALK: self.trigger('talkStart', abonents); break;
-						//case this.states.CALLWEBPHONE: self.trigger('webphoneCallStart', abonents); break;
+						case this.states.RING: self.trigger('ringStart', this.getAbonents(true)); break;
+						case this.states.BACKRING: self.trigger('backRingStart', this.getAbonents(true)); break;
+						case this.states.CALL: self.trigger('callStart', this.getAbonents(true)); break;
+						case this.states.BACKCALL: self.trigger('callStart', this.getAbonents(true)); break;
+						case this.states.TALK: self.trigger('talkStart', this.getAbonents(true)); break;
+						//case this.states.CALLWEBPHONE: self.trigger('webphoneCallStart', this.getAbonents(true)); break;
 					}
 
+//					var newPhoneState = this.apiGetPhoneState(this._stateId);
+					var newState = this.apiGetStateStr(this._stateId);
+//					if ( newPhoneState != oldPhoneState ) {
+//						self.trigger('phoneStateChange', newPhoneState, oldPhoneState );
+//
+//					}
+					if ( newState != oldState ) {
+						self.trigger('stateChange', newState, oldState );
+					}
+				}
 
+				if ( newStateId === this.states.READY || newStateId === this.states.DISCONNECTED ) {
+					this.removeAbonents();
+					this.conferenceId(false);
+					this.isConfCreator(false);
+					if ( newStateId === this.states.DISCONNECTED ) {
+						this.clearHold();
+					}
 				}
 
 				return this._stateId;
@@ -3418,14 +3400,9 @@ Oktell = (function(){
 			/**
 			 * Load phone state
 			 * @param callback
-			 * @params knownData some already known data (for example knownData.isAutoCall, knownData.sequence, etc)
-			 * possible properties for knownData
-			 * 		isAutoCall: boolean
 			 */
-			loadStates: function(callback, knownData) {
+			loadStates: function(callback) {
 				var that = this;
-				knownData = knownData || {};
-				extend(that.currentSessionData, knownData);
 				//that.loadFlashInfo(function(data){
 				if ( ! serverConnected() ) {
 					return false;
@@ -3436,68 +3413,30 @@ Oktell = (function(){
 						callFunc(callback,getReturnObj(data.result,data,1103,' getextendedlineinfo'));
 					}
 
-					log('getextendedlineinfo result and that.currentSessionData', data, that.currentSessionData);
-
 					if ( data.result ) {
 
 						var oldState = that.state();
-						var oldHoldInfo = that.getHoldInfo();
-						var oldAbonents = that.getAbonents(true);
-						var oldAb = oldAbonents && oldAbonents[0] || false;
 
 						var setStateFromResultData = function() {
-							log('setStateFromResultData');
-
-							// check if toggle called
-							var newHoldInfo = that.getHoldInfo();
-							var newAbonents = that.getAbonents(true);
-							var newAb = newAbonents && newAbonents[0] || false;
-
-							/*if ( newAb && oldAb && oldHoldInfo.hasHold && newHoldInfo.hasHold &&
-									( // curr ab is old hold
-										( newAb.conferenceId && oldHoldInfo.conferenceId && newAb.conferenceId == oldHoldInfo.conferenceId ) || // curr ab is conf and it is old hold
-										( ! newAb.conferenceId && oldHoldInfo.abonent && newAb.key == oldHoldInfo.abonent.key ) // or curr ab isnt conf and it is old hold
-									)
-									&&
-									( // old ab is curr hold
-										( oldAb.conferenceId && newHoldInfo.conferenceId && oldAb.conferenceId == newHoldInfo.conferenceId ) || // curr ab is conf and it is old hold
-										( ! oldAb.conferenceId && newHoldInfo.abonent && oldAb.key == newHoldInfo.abonent.key ) // or curr ab isnt conf and it is old hold
-									)
-								) {
-
-								log('toggle was called');
-
-							} else*/ if ( that.currentSessionData.isAutoCall && ! data.abonent.isautocall && oldState == that.states.READY ) {
-								that.state( that.states.BACKRING, oldAbonents );
-							} else if ( data.abonent.isautocall ) {
-								that.currentSessionData.isAutoCall = false;
-								that.state( that.states.BACKCALL, oldAbonents );
+							if ( data.abonent.isautocall ) {
+								that.state( that.states.BACKCALL );
 							} else if ( data.abonent.isringing ) {
-								if ( data.abonent.direction == 'acm_callback' || oldState == that.states.BACKRING ) {
-									that.state( that.states.BACKRING, oldAbonents );
+								if ( data.abonent.direction == 'acm_callback' ) {
+									that.state( that.states.BACKRING );
 								} else {
-									that.state( that.states.RING, oldAbonents );
+									that.state( that.states.RING );
 								}
-							} else if ( ( !( that.currentSessionData.isAutoCall ) && (
-											data.abonent.iscommutated ||
-											data.abonent.iswaitinginflash ||
-											data.abonent.isconference ) ) ||
-										( data.linestatestr == 'lsCommutated' && data.abonent.isivr && ! data.isroutingivr )
-								) {  // || data.abonent.isivr) ) {
+							} else if ( data.abonent.iscommutated || data.abonent.iswaitinginflash || data.abonent.isconference || data.abonent.isivr ) {
 								that.startTalkTimer(parseInt(data.timertalklensec) || 0);
-								var newTalkStarted = that.currentSessionData.commStopped;
-								that.currentSessionData.commStopped = false;
-								that.state( that.states.TALK, oldAbonents, newTalkStarted );
-							} else if ( data.abonent.extline || data.abonent.number ) { //
-								that.currentSessionData.isAutoCall = false;
-								that.state( that.states.CALL, oldAbonents );
+								that.state( that.states.TALK );
+							} else if ( data.abonent.extline || data.abonent.number ) { // peace of shit
+								that.state( that.states.CALL );
 							} else if ( data.linestatestr == 'lsDisconnected' ) {
 								that.state( that.states.DISCONNECTED );
 							} else if ( oldState == that.states.TALK && that.sipHasRTCSession ) {
 
-							} else if ( data.linestatestr != 'lsReserved' ) {
-								that.currentSessionData = {};
-								that.state( that.states.READY, oldAbonents );
+							} else {
+								that.state( that.states.READY );
 //								if ( oldState !== that.state() && that.sipActive ) {
 //									that.sip.hangup();
 //								}
@@ -3512,8 +3451,10 @@ Oktell = (function(){
 
 						if ( data.abonent ) {
 							if ( ! data.abonent.conferenceid ) {
-								data.abonent.chainId = data.chainid;
-								that.setAbonent( data.abonent, ( oldState == that.states.TALK && that.sipHasRTCSession ) || data.abonent.isivr || that.currentSessionData.isAutoCall );
+								if ( size(that.abonentList) == 0 || that.notRoutingIvrState() ) {
+									that.notRoutingIvrState(false);
+									that.setAbonent(data.abonent, ( oldState == that.states.TALK && that.sipHasRTCSession ) || data.abonent.isivr );
+								}
 								that.conferenceId(false);
 								setStateFromResultData();
 								callCallback();
@@ -3554,7 +3495,7 @@ Oktell = (function(){
 			 * @return {*}
 			 */
 			createAbonent: function(data) {
-				var key = data.competitorid || data.number || data.userid || data.callerid || ( data.chainId != '00000000-0000-0000-0000-000000000000' && data.chainId );
+				var key = data.competitorid || data.number || data.userid || data.callerid;
 				if ( ! key && data.isivr ) {
 					key = newGuid();
 				}
@@ -3575,8 +3516,6 @@ Oktell = (function(){
 						isConferenceGhostMajor: data.competitorid && data.isghostmajor ? true : undefined,
 						isConferenceHidden: data.competitorid && data.ishidden ? true : undefined,
 						isExternal: data.isextline ? true : false,
-
-                        chainId: data.chainId,
 
 						phone: data.number ? data.number.toString() : ( data.calledid ? data.callerid.toString() : undefined ),
 						phoneFormatted: data.number ? formatPhone( data.number.toString() ) : undefined,
@@ -3807,24 +3746,24 @@ Oktell = (function(){
 					var user = users[number];
 					var numberObj = numbers[number] || numbersById[number];
 //					if ( ! user && numberObj ) {
-//						each(users, function(u){
-//							if ( u.numberObj == numberObj || u.number == number ) {
-//								user = u;
-//								return breaker;
-//							}
-//						});
+////						each(users, function(u){
+////							if ( u.numberObj == numberObj || u.number == number ) {
+////								user = u;
+////								return breaker;
+////							}
+////						});
 //					}
 
-//					if ( user ) {
-//						log('setAbonent with user');
-//						that.setAbonent(user);
-//					} else if ( numberObj ) {
-//						log('setAbonent with numberObj');
-//						that.setAbonent(numberObj);
-//					} else {
-//						log('setAbonent with number');
-//						that.setAbonent({number:number});
-//					}
+					if ( user ) {
+						log('setAbonent with user');
+						that.setAbonent(user);
+					} else if ( numberObj ) {
+						log('setAbonent with numberObj');
+						that.setAbonent(numberObj);
+					} else {
+						log('setAbonent with number');
+						that.setAbonent({number:number});
+					}
 					callFunc(callback, getSuccessObj());
 				} else if ( that.state() == that.states.READY || that.state() == that.states.TALK ) {
 					// обратный вызов
@@ -3860,9 +3799,9 @@ Oktell = (function(){
 				params.number = number.toString();
 
 				sendOktell( 'pbxautocallstart', params, function( data ) {
-//					that.loadStates(function(){
+					that.loadStates(function(){
 						callFunc(callback,data);
-//					});
+					});
 				});
 			},
 
@@ -4062,37 +4001,25 @@ Oktell = (function(){
 			endCall: function( numbers ) {
 				var that = this;
 				numbers = toStringsArray(numbers);
-				var isAbonent = false;
-				var isMe = false;
-				if ( numbers ) {
-					each(numbers, function(n){
-						if ( ! isAbonent && that.isAbonent(n) ) {
-							isAbonent = true;
-						}
-						if ( ! isMe && ( n == oktellInfo.number || n == oktellInfo.userid ) ) {
-							isMe = true;
-						}
-					});
-				}
 
-				if ( ! numbers ) {
-					if ( that.state() == that.states.TALK || that.state() == that.states.CALL || that.getHoldInfo().hasHold ) {
-						that.abortCall();
-					} else if ( that.state() == that.states.BACKCALL ) {
-						that.abortAcmCall();
-					} else if ( that.state() == that.states.RING || that.state() == that.states.BACKRING ) {
-						that.declineCall();
-					}
-				} else if ( that.getHoldInfo().hasHold && ( isMe || ( ! that.conferenceId() && isAbonent ) ) ) {
+				if ( that.getHoldInfo().hasHold ) {
 					that.makeFlash('abort');
-				} else if ( isAbonent || isMe ) {
+				} else {
 					if ( that.state() == that.states.TALK ) {
 						if ( that.conferenceId() ) {
-							that.kickConfAbonent( that.conferenceId(), numbers);
+							if ( numbers ) {
+								// kick numbers from conf
+								that.kickConfAbonent( that.conferenceId(), numbers);
+							} else {
+								// end conf
+								that.exitConf(that.conferenceId());
+							}
 						} else {
+							// abort call
 							that.abortCall();
 						}
 					} else if ( that.state() == that.states.BACKCALL ) {
+						// abort acm call
 						that.abortAcmCall();
 					} else if ( that.state() == that.states.CALL ) {
 						that.abortCall();
@@ -4415,11 +4342,7 @@ Oktell = (function(){
 			},
 
 			hold: function() {
-				if ( this.sipActive ) {
-					this.sip.hold();
-				} else if ( this.state() == this.states.TALK || this.getHoldInfo().hasHold ) {
-					this.makeFlash('switch');
-				}
+				if ( this.sipActive ) { this.sip.hold(); }
 			},
 
 			resume: function() {
@@ -4567,7 +4490,7 @@ Oktell = (function(){
 						a.push('ghostListen', 'ghostHelp', 'ghostConference');
 					}
 				} else if ( abonent ) {
-					if ( phone.sipActive && phoneState == phone.states.RING ) {
+					if ( phoneState == phone.states.RING ) {
 						a.push('answer');
 					}
 					if ( isConf ) {
@@ -4953,8 +4876,7 @@ Oktell = (function(){
 			} else if ( stateId == 7 ) {
 				phone.state( phone.states.DISCONNECTED );
 			} else {
-				phone.loadStates();
-//				phone.state( phone.states.READY );
+				phone.state( phone.states.READY );
 			}
 		});
 
@@ -4962,18 +4884,6 @@ Oktell = (function(){
 		 * Subscribe to stuff on login
 		 */
 		events.on('login', function(){
-
-			server.bindOktellEvent('linestatechanged', function(data){
-				setTimeout(function(){
-					phone.loadStates();
-				}, 500);
-			});
-
-			server.bindOktellEvent('flashstatechanged', function(data){
-				setTimeout(function(){
-					phone.loadStates();
-				}, 500);
-			});
 
 			server.bindOktellEvent('confcompositionchanged', function(data){
 				if ( data.eventinfo.conferenceid == phone.conferenceId() ) {
@@ -4983,16 +4893,11 @@ Oktell = (function(){
 			});
 
 			server.bindOktellEvent('phoneevent_acmcallstarted', function(data){
-				phone.loadStates(null, {
-//					sequence: phone.state() == phone.states.READY ? '': null,
-					isAutoCall: true
-				});
+				phone.loadStates();
 			});
 
 			server.bindOktellEvent('phoneevent_acmcallstopped', function(data){
-				setTimeout(function(){
-					phone.loadStates();
-				}, 700);
+				phone.loadStates();
 			});
 
 			server.bindOktellEvent('phoneevent_ringstarted', function(data){
@@ -5010,8 +4915,6 @@ Oktell = (function(){
 			server.bindOktellEvent('phoneevent_ivrstarted', function(data){
 				if ( data.isroutingivr === false ) {
 					phone.notRoutingIvrState(true);
-				} else if ( data.isroutingivr === true && phone.state() == phone.states.READY ) {
-					phone.loadStates();
 				}
 			});
 
@@ -5032,20 +4935,14 @@ Oktell = (function(){
 						});
 					});
 				} else {
-					setTimeout(function(){
-						phone.loadStates(function(){}, {
-							commStarted: true
-						});
-					}, 700);
+					phone.loadStates();
 				}
 			});
 
 			server.bindOktellEvent('phoneevent_commstopped', function(data){
 				phone.clearTalkTimer();
 				setTimeout(function(){
-					phone.loadStates(function(){}, {
-						commStopped: true
-					});
+					phone.loadStates(function(){});
 				}, 700);
 			});
 

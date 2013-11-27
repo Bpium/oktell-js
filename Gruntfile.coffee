@@ -6,6 +6,47 @@ module.exports = (grunt)->
 		build: 'build'
 		version: '1.6.0'
 		chromePath: 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'
+		karmaChromeUsersDir: 'c:/www/karmaTestChromeUserDir'
+
+	karmaStartPort = 9000
+	karmaServersCount = 2
+
+	concurrentConfig =
+		test:
+			tasks: []
+			options:
+				limit: 50
+				logConcurrentOutput: true
+
+	karmaConfig =
+		options:
+			autoWatch: true
+			configFile: 'karma.conf.js'
+			singleRun: false
+#			browsers: ['Chrome_webrtc']
+			customLaunchers: {}
+
+
+
+	for i in [karmaStartPort..karmaStartPort+karmaServersCount-1]
+		taskName = 'server'+i
+		userDir = myConf.karmaChromeUsersDir+'/'+i
+		if not grunt.file.isDir(userDir)
+			grunt.file.mkdir userDir
+
+
+		karmaConfig.options.customLaunchers[taskName] =
+			base: 'ChromeCanary',
+			flags: [
+#				'--use-fake-device-for-media-stream',
+				'--user-data-dir='+(userDir.replace(/\//g, '\\\\'))
+			]
+
+		karmaConfig[taskName] =
+			port: i
+			browsers: [taskName]
+
+		concurrentConfig.test.tasks.push 'karma:' + taskName
 
 	grunt.initConfig
 		myConf: myConf
@@ -64,14 +105,18 @@ module.exports = (grunt)->
 					to: '"version": "<%= myConf.version %>",'
 				}]
 
-		karma:
-			options:
-				configFile: 'karma.conf.js'
-			first:
-#				runnerPort: 9999
-				singleRun: true,
-				browsers: ['<%= myConf.chromePath %>']
+		karma: karmaConfig
 
+		concurrent: concurrentConfig
+
+		parallel: {
+			assets: {
+				options: {
+					grunt: true
+				},
+				tasks: ['karma:first', 'karma:second']
+			}
+		}
 
 
 	grunt.registerTask 'build', [

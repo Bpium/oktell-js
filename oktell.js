@@ -3472,7 +3472,12 @@ Oktell = (function(){
 								} else {
 									that.state( that.states.RING, oldAbonents );
 								}
-							} else if ( !( that.currentSessionData.isAutoCall ) && (data.abonent.iscommutated || data.abonent.iswaitinginflash || data.abonent.isconference ) ) {  // || data.abonent.isivr) ) {
+							} else if ( ( !( that.currentSessionData.isAutoCall ) && (
+											data.abonent.iscommutated ||
+											data.abonent.iswaitinginflash ||
+											data.abonent.isconference ) ) ||
+										( data.linestatestr == 'lsCommutated' && data.abonent.isivr && ! data.isroutingivr )
+								) {  // || data.abonent.isivr) ) {
 								that.startTalkTimer(parseInt(data.timertalklensec) || 0);
 								var newTalkStarted = that.currentSessionData.commStopped;
 								that.currentSessionData.commStopped = false;
@@ -3543,7 +3548,7 @@ Oktell = (function(){
 			 * @return {*}
 			 */
 			createAbonent: function(data) {
-				var key = data.competitorid || data.number || data.userid || data.callerid;
+				var key = data.competitorid || data.number || data.userid || data.callerid || ( data.chainId != '00000000-0000-0000-0000-000000000000' && data.chainId );
 				if ( ! key && data.isivr ) {
 					key = newGuid();
 				}
