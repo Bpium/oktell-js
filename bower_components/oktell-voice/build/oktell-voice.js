@@ -19,6 +19,14 @@
  * @namespace
  */
 (function (window) {
+	var console = {
+		log: function(){},
+		warn: function(){},
+		error: function(){},
+		debug: function(){}
+
+	}
+
 
 	if ( typeof Object.defineProperties !== 'function' ) {
 		return false;

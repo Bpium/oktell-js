@@ -4,25 +4,29 @@ module.exports = (grunt)->
 
 	myConf =
 		build: 'build'
-		version: '1.6.0'
+		version: '1.6.1'
 		chromePath: 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'
 		karmaChromeUsersDir: 'c:/www/karmaTestChromeUserDir'
 
-	karmaStartPort = 9000
-	karmaServersCount = 2
+	karmaTestConfig = grunt.file.read('test/config.coffee')
+
+	karmaStartPort = parseInt karmaTestConfig.match(/karmaStartPort[ ]*=[ ]*([0-9]{4,5})/)?[1]
+	karmaServersCount = parseInt karmaTestConfig.match(/okServersCount[ ]*=[ ]*([0-9]{1,5})/)?[1]
+
+	console.log "karmaStartPort = #{karmaStartPort}, karmaServersCount = #{karmaServersCount}"
 
 	concurrentConfig =
 		test:
 			tasks: []
 			options:
 				limit: 50
-				logConcurrentOutput: true
+				logConcurrentOutput: false
 
 	karmaConfig =
 		options:
-			autoWatch: true
+			autoWatch: false
 			configFile: 'karma.conf.js'
-			singleRun: false
+			singleRun: true
 #			browsers: ['Chrome_webrtc']
 			customLaunchers: {}
 

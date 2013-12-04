@@ -14,6 +14,8 @@ module.exports = function (config) {
 
 		// list of files / patterns to load in the browser
 		files: [
+			'bower_components/lodash/dist/lodash.js',
+			'bower_components/jquery/jquery.js',
 			'oktell.js',
 			'bower_components/oktell-voice/build/oktell-voice.js',
 			'test/mock/**/*.js',

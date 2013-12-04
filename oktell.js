@@ -1354,13 +1354,22 @@ Oktell = (function(){
 			if ( ! eventNames ) {
 				return false;
 			}
-			var realArgs = arguments;
+			var args = Array.prototype.slice.call( arguments, 1 );
+			var allEventCalls = calls['all'];
 			each( eventNames, function(event){
 				var eventCalls = calls[ event ];
 				if ( eventCalls ) {
 					each(eventCalls, function(eventCall){
 						if ( eventCall && typeof eventCall.callback == 'function' ) {
-							eventCall.callback.apply( eventCall.context || undefined, Array.prototype.slice.call( realArgs, 1 ) );
+							eventCall.callback.apply( eventCall.context || undefined, args );
+						}
+					});
+				}
+				if ( allEventCalls ) {
+					var allEventArgs = [event].concat(args);
+					each(allEventCalls, function(eventCall){
+						if ( eventCall && typeof eventCall.callback == 'function' ) {
+							eventCall.callback.apply( eventCall.context || undefined, allEventArgs );
 						}
 					});
 				}
@@ -3344,7 +3353,7 @@ Oktell = (function(){
 					var oldStateId = this._stateId;
 					var oldState = this.apiGetStateStr(oldStateId);
 
-					log('CHANGE STATE FROM ' + this.getStateStr(this._stateId) + ' TO ' + this.getStateStr(newStateId), this.getAbonents(true));
+					log('CHANGE STATE FROM ' + this.getStateStr(this._stateId) + ' TO ' + this.getStateStr(newStateId), this.getAbonents(true), oldAbonents);
 
 					this._stateId = newStateId;
 
@@ -3476,7 +3485,7 @@ Oktell = (function(){
 											data.abonent.iscommutated ||
 											data.abonent.iswaitinginflash ||
 											data.abonent.isconference ) ) ||
-										( data.linestatestr == 'lsCommutated' && data.abonent.isivr && ! data.isroutingivr )
+										( data.linestatestr == 'lsCommutated' && data.abonent.isivr && ! data.abonent.isroutingivr )
 								) {  // || data.abonent.isivr) ) {
 								that.startTalkTimer(parseInt(data.timertalklensec) || 0);
 								var newTalkStarted = that.currentSessionData.commStopped;
@@ -5011,6 +5020,7 @@ Oktell = (function(){
 
 			server.bindOktellEvent('phoneevent_commstarted', function(data){
 				phone.startTalkTimer(0);
+				phone.currentSessionData.commStarted = true;
 				if ( data.isconference ) {
 					if ( phone.buildConfFromCommCallback ) {
 						phone.isConfCreator(true);
@@ -5027,19 +5037,16 @@ Oktell = (function(){
 					});
 				} else {
 					setTimeout(function(){
-						phone.loadStates(function(){}, {
-							commStarted: true
-						});
+						phone.loadStates(function(){});
 					}, 700);
 				}
 			});
 
 			server.bindOktellEvent('phoneevent_commstopped', function(data){
 				phone.clearTalkTimer();
+				phone.currentSessionData.commStopped = true;
 				setTimeout(function(){
-					phone.loadStates(function(){}, {
-						commStopped: true
-					});
+					phone.loadStates(function(){});
 				}, 700);
 			});
 
@@ -5221,7 +5228,7 @@ Oktell = (function(){
 
 		}
 
-		self.version = '1.6.0';
+		self.version = '1.6.1';
 
 	};
 	extend( Oktell.prototype , Events );
