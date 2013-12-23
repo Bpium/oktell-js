@@ -2130,7 +2130,10 @@ Oktell = (function(){
 			// change pass
 			2801: 'wrong old password',
 			2802: 'incorrect new password',
-			2803: 'error while exec changepassword method on server'
+			2803: 'error while exec changepassword method on server',
+			// answer
+			2901: 'incorrect state',
+			2902: 'phone probably does not support intercom calls'
 
 		};
 
@@ -3120,6 +3123,7 @@ Oktell = (function(){
 			_conferenceId: false,
 			abonentList: {},
 			queueList: {},
+			answerCheckTimeout: 3000,
 			_talkLength: 0,
 			_talkTimer: false,
 			sip: false,
@@ -3178,7 +3182,40 @@ Oktell = (function(){
 				return this._notRoutingIvrState;
 			},
 
-			answer: function() { if ( this.sipActive ) { this.sip.answer(); } },
+			answer: function(callback) {
+				var self = this,
+					checkInterval,
+					checkIntercomSupport,
+					afterTimer,
+					isAnswerSuccess;
+
+				if ( self.sipActive ) {
+					self.sip.answer();
+					callFunc(callback, getSuccessObj()); // TODO check answer result for callback
+				} else if ( self.intercomSupport === false ) {
+					callFunc(callback, getErrorObj(2902));
+				} else if ( self.state() == self.states.RING ) {
+					sendOktell('pbxanswercall');
+					afterTimer = function(){
+						clearInterval(checkInterval);
+						clearTimeout(checkTimer);
+						callFunc(callback, getReturnObj(self.intercomSupport, {}, 2902));
+					}
+					checkIntercomSupport = function(){
+						return self.intercomSupport = self.state() == self.states.TALK;
+					}
+					checkInterval = setInterval(function(){
+						if ( checkIntercomSupport() ) {
+							afterTimer();
+						}
+					}, 50);
+					checkTimer = setTimeout(function(){
+						afterTimer();
+					}, self.answerCheckTimeout);
+				} else {
+					callFunc(callback, getErrorObj(2901));
+				}
+			},
 
 			/**
 			 * Set info about conference
@@ -5228,7 +5265,7 @@ Oktell = (function(){
 
 		}
 
-		self.version = '1.6.1';
+		self.version = '1.7.0';
 
 	};
 	extend( Oktell.prototype , Events );
