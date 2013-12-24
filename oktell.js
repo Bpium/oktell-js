@@ -1920,7 +1920,8 @@ Oktell = (function(){
 				pbxmaketransfer: {v:120725},
 				triggercustomevent: {v:120725},
 				getallusernumbers: {v:120920},
-				cc_getlunchtypes: {v:130101}
+				cc_getlunchtypes: {v:130101},
+				pbxanswercall: {v:131218}
 			},
 			httpQueryData = {},
 			cookieSessionName = '___oktellsessionid',
@@ -3131,6 +3132,7 @@ Oktell = (function(){
 			sipHasRTCSession: false,
 			_notRoutingIvrState: false,
 			currentSessionData: {},
+			intercomSupport: null,
 			states: {
 				DISCONNECTED: -1,
 				READY: 0,
@@ -4835,6 +4837,9 @@ Oktell = (function(){
 									oktellInfo.allowedProcedures = data.alloweddbstoredprocs || {};
 									oktellInfo.oktellWebServerPort = data.version.webserverport;
 									oktellInfo.oktellWebServerLink = getWebServerLink();
+									if ( ! isValidMethodVersion('pbxanswercall') ) {
+										phone.intercomSupport = false;
+									}
 									sendOktell('getmyuserinfo', {}, function(data){
 										if ( data.result ) {
 											oktellInfo.number = data.mainpbxnumber;
