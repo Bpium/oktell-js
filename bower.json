@@ -18,7 +18,7 @@
     "!bower.json",
     "!README.md"
   ],
-  "dependencies": {
+  "devDependencies": {
     "lodash": "~2.4.0",
     "jquery": "~2.0.3"
   }
