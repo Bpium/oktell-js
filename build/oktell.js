@@ -1,6 +1,6 @@
 /*
  * Oktell.js
- * version 1.6.1
+ * version 1.7.0
  * http://js.oktell.ru/
  */
 
@@ -1926,7 +1926,8 @@ Oktell = (function(){
 				pbxmaketransfer: {v:120725},
 				triggercustomevent: {v:120725},
 				getallusernumbers: {v:120920},
-				cc_getlunchtypes: {v:130101}
+				cc_getlunchtypes: {v:130101},
+				pbxanswercall: {v:131218}
 			},
 			httpQueryData = {},
 			cookieSessionName = '___oktellsessionid',
@@ -2136,7 +2137,13 @@ Oktell = (function(){
 			// change pass
 			2801: 'wrong old password',
 			2802: 'incorrect new password',
-			2803: 'error while exec changepassword method on server'
+			2803: 'error while exec changepassword method on server',
+			// answer
+			2901: 'incorrect state',
+			2902: 'phone probably does not support intercom calls',
+			// uploadFile
+			3001: 'error while getting temp pass',
+			3002: 'aborted in beforeRequest callback function'
 
 		};
 
@@ -2555,6 +2562,17 @@ Oktell = (function(){
 				return uploadFilePure.apply(self, arguments);
 			}
 
+			var accept = options.accept;
+			delete options.accept;
+			if ( accept ) {
+				if ( ! isArray(accept) ) {
+					accept = [accept];
+				}
+				accept = 'accept="' + accept.join(',') + '"';
+			} else {
+				accept = '';
+			}
+
 			var rid = Math.random().toString().replace('.',''),
 				frameId = '_oktelljs_user_avatar_frame_' + rid,
 				formId = '_oktelljs_user_avatar_form_' + rid,
@@ -2562,7 +2580,13 @@ Oktell = (function(){
 
 			$('body').append('<iframe width="0" height="0" id="'+frameId+'" name="'+frameId+'"></iframe>');
 			$('body').append('<form enctype="multipart/form-data" target="'+frameId+'" id="'+formId+'" action="" method="post">' +
-				'<input style="visibility: hidden;" type="file" name="file" id="'+inputId+'" /></form>');
+				'<input style="visibility: hidden;" type="file" ' + accept + ' name="file" id="'+inputId+'" /></form>');
+
+			var callCallback = function(data) {
+				$('#'+formId).remove();
+				$('#'+frameId).remove();
+				callFunc(callback, data);
+			}
 
 			$('#'+inputId).change(function(e){
 
@@ -2574,6 +2598,11 @@ Oktell = (function(){
 
 				var fileName = file.replace('/', '\\').split('\\');
 				fileName = fileName[fileName.length-1];
+
+				if ( typeof beforeRequest == 'function' && beforeRequest(getSuccessObj({fileName:fileName})) === false ) {
+					callCallback(getErrorObj(3002));
+					return;
+				}
 
 				getHttpQueryPass( true, function(data){
 
@@ -2591,15 +2620,12 @@ Oktell = (function(){
 
 							path = path[1].replace( /\\/g , '/');
 
-							$('#'+formId).remove();
-							$('#'+frameId).remove();
-
-							callFunc(callback, getSuccessObj({path:path}));
+							callCallback(getSuccessObj({path:path}));
 						});
 
-						callFunc(beforeRequest, getSuccessObj({fileName:fileName}));
-
 						$('#'+formId).submit()
+					} else {
+						callCallback(getErrorObj(3001));
 					}
 
 				});
@@ -2624,6 +2650,17 @@ Oktell = (function(){
 				formId = '_oktelljs_user_avatar_form_' + rid,
 				inputId = '_oktelljs_user_profile_select_file_' + rid;
 
+			var accept = options.accept;
+			delete options.accept;
+			if ( accept ) {
+				if ( ! isArray(accept) ) {
+					accept = [accept];
+				}
+				accept = 'accept="' + accept.join(',') + '"';
+			} else {
+				accept = '';
+			}
+
 			var iframe = document.createElement('iframe');
 			iframe.id = frameId;
 			iframe.name = frameId;
@@ -2645,7 +2682,16 @@ Oktell = (function(){
 			input.type = 'file';
 			input.id = inputId
 			input.name = 'file';
+			input.accept =  accept;
 			form.appendChild(input);
+
+			var callCallback = function(data) {
+				var elem;
+				(elem=document.getElementById(frameId)).parentNode.removeChild(elem);
+				(elem=document.getElementById(formId)).parentNode.removeChild(elem);
+				callFunc(callback, data);
+			}
+
 
 			input.onchange = function() {
 				var file = input.value;
@@ -2656,6 +2702,11 @@ Oktell = (function(){
 
 				var fileName = file.replace('\\', '/').split('/');
 				fileName = fileName[fileName.length-1];
+
+				if ( typeof beforeRequest == 'function' && beforeRequest(getSuccessObj({fileName:fileName})) === false ) {
+					callCallback(getErrorObj(3002));
+					return;
+				}
 
 				getHttpQueryPass( true, function(data){
 					if ( data.result ) {
@@ -2671,16 +2722,12 @@ Oktell = (function(){
 
 							path = path[1].replace( /\\/g , '/');
 
-							var elem;
-							(elem=document.getElementById(frameId)).parentNode.removeChild(elem);
-							(elem=document.getElementById(formId)).parentNode.removeChild(elem);
-
-							callFunc(callback, getSuccessObj({path:path}));
+							callCallback(getSuccessObj({path:path}));
 						});
 
-						callFunc(beforeRequest, getSuccessObj({fileName:fileName}));
-
 						form.submit();
+					} else {
+						callCallback(getErrorObj(3001));
 					}
 				});
 			}
@@ -3126,6 +3173,7 @@ Oktell = (function(){
 			_conferenceId: false,
 			abonentList: {},
 			queueList: {},
+			answerCheckTimeout: 3000,
 			_talkLength: 0,
 			_talkTimer: false,
 			sip: false,
@@ -3133,6 +3181,7 @@ Oktell = (function(){
 			sipHasRTCSession: false,
 			_notRoutingIvrState: false,
 			currentSessionData: {},
+			intercomSupport: null,
 			states: {
 				DISCONNECTED: -1,
 				READY: 0,
@@ -3184,7 +3233,40 @@ Oktell = (function(){
 				return this._notRoutingIvrState;
 			},
 
-			answer: function() { if ( this.sipActive ) { this.sip.answer(); } },
+			answer: function(callback) {
+				var self = this,
+					checkInterval,
+					checkIntercomSupport,
+					afterTimer,
+					isAnswerSuccess;
+
+				if ( self.sipActive ) {
+					self.sip.answer();
+					callFunc(callback, getSuccessObj()); // TODO check answer result for callback
+				} else if ( self.intercomSupport === false ) {
+					callFunc(callback, getErrorObj(2902));
+				} else if ( self.state() == self.states.RING ) {
+					sendOktell('pbxanswercall');
+					afterTimer = function(){
+						clearInterval(checkInterval);
+						clearTimeout(checkTimer);
+						callFunc(callback, getReturnObj(self.intercomSupport, {}, 2902));
+					}
+					checkIntercomSupport = function(){
+						return self.intercomSupport = self.state() == self.states.TALK;
+					}
+					checkInterval = setInterval(function(){
+						if ( checkIntercomSupport() ) {
+							afterTimer();
+						}
+					}, 50);
+					checkTimer = setTimeout(function(){
+						afterTimer();
+					}, self.answerCheckTimeout);
+				} else {
+					callFunc(callback, getErrorObj(2901));
+				}
+			},
 
 			/**
 			 * Set info about conference
@@ -4534,12 +4616,13 @@ Oktell = (function(){
 			var iAmAbonent = isConf && phone.isAbonent( oktellInfo.userid );
 			var iAmCreator = isConf && iAmAbonent && iAmAbonent.isConferenceCreator;
 			var phoneState = phone.state();
+			var intercomSupport = phone.intercomSupport;
 
 			if ( isInQueue ) {
 
 			} else if ( isMe ) {
 				if ( phoneState != phone.states.DISCONNECTED && phoneState != phone.states.READY ) {
-					if ( phone.sipActive ) {
+					if ( ( phoneState == phone.states.RING || phoneState == phone.states.BACKRING ) && ( phone.sipActive || intercomSupport !== false ) ) {
 						a.push('answer');
 					}
 					a.push('endCall');
@@ -4576,7 +4659,7 @@ Oktell = (function(){
 						a.push('ghostListen', 'ghostHelp', 'ghostConference');
 					}
 				} else if ( abonent ) {
-					if ( phone.sipActive && phoneState == phone.states.RING ) {
+					if ( phoneState == phone.states.RING && ( phone.sipActive || intercomSupport !== false ) ) {
 						a.push('answer');
 					}
 					if ( isConf ) {
@@ -4803,6 +4886,9 @@ Oktell = (function(){
 									oktellInfo.allowedProcedures = data.alloweddbstoredprocs || {};
 									oktellInfo.oktellWebServerPort = data.version.webserverport;
 									oktellInfo.oktellWebServerLink = getWebServerLink();
+									if ( ! isValidMethodVersion('pbxanswercall') ) {
+										phone.intercomSupport = false;
+									}
 									sendOktell('getmyuserinfo', {}, function(data){
 										if ( data.result ) {
 											oktellInfo.number = data.mainpbxnumber;
@@ -5234,7 +5320,7 @@ Oktell = (function(){
 
 		}
 
-		self.version = '1.6.1';
+		self.version = '1.7.0';
 
 	};
 	extend( Oktell.prototype , Events );

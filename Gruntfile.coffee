@@ -4,7 +4,7 @@ module.exports = (grunt)->
 
 	myConf =
 		build: 'build'
-		version: '1.6.1'
+		version: '1.7.0'
 		chromePath: 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'
 		karmaChromeUsersDir: 'c:/www/karmaTestChromeUserDir'
 

@@ -2134,7 +2134,10 @@ Oktell = (function(){
 			2803: 'error while exec changepassword method on server',
 			// answer
 			2901: 'incorrect state',
-			2902: 'phone probably does not support intercom calls'
+			2902: 'phone probably does not support intercom calls',
+			// uploadFile
+			3001: 'error while getting temp pass',
+			3002: 'aborted in beforeRequest callback function'
 
 		};
 
@@ -2553,6 +2556,17 @@ Oktell = (function(){
 				return uploadFilePure.apply(self, arguments);
 			}
 
+			var accept = options.accept;
+			delete options.accept;
+			if ( accept ) {
+				if ( ! isArray(accept) ) {
+					accept = [accept];
+				}
+				accept = 'accept="' + accept.join(',') + '"';
+			} else {
+				accept = '';
+			}
+
 			var rid = Math.random().toString().replace('.',''),
 				frameId = '_oktelljs_user_avatar_frame_' + rid,
 				formId = '_oktelljs_user_avatar_form_' + rid,
@@ -2560,7 +2574,13 @@ Oktell = (function(){
 
 			$('body').append('<iframe width="0" height="0" id="'+frameId+'" name="'+frameId+'"></iframe>');
 			$('body').append('<form enctype="multipart/form-data" target="'+frameId+'" id="'+formId+'" action="" method="post">' +
-				'<input style="visibility: hidden;" type="file" name="file" id="'+inputId+'" /></form>');
+				'<input style="visibility: hidden;" type="file" ' + accept + ' name="file" id="'+inputId+'" /></form>');
+
+			var callCallback = function(data) {
+				$('#'+formId).remove();
+				$('#'+frameId).remove();
+				callFunc(callback, data);
+			}
 
 			$('#'+inputId).change(function(e){
 
@@ -2572,6 +2592,11 @@ Oktell = (function(){
 
 				var fileName = file.replace('/', '\\').split('\\');
 				fileName = fileName[fileName.length-1];
+
+				if ( typeof beforeRequest == 'function' && beforeRequest(getSuccessObj({fileName:fileName})) === false ) {
+					callCallback(getErrorObj(3002));
+					return;
+				}
 
 				getHttpQueryPass( true, function(data){
 
@@ -2589,15 +2614,12 @@ Oktell = (function(){
 
 							path = path[1].replace( /\\/g , '/');
 
-							$('#'+formId).remove();
-							$('#'+frameId).remove();
-
-							callFunc(callback, getSuccessObj({path:path}));
+							callCallback(getSuccessObj({path:path}));
 						});
 
-						callFunc(beforeRequest, getSuccessObj({fileName:fileName}));
-
 						$('#'+formId).submit()
+					} else {
+						callCallback(getErrorObj(3001));
 					}
 
 				});
@@ -2622,6 +2644,17 @@ Oktell = (function(){
 				formId = '_oktelljs_user_avatar_form_' + rid,
 				inputId = '_oktelljs_user_profile_select_file_' + rid;
 
+			var accept = options.accept;
+			delete options.accept;
+			if ( accept ) {
+				if ( ! isArray(accept) ) {
+					accept = [accept];
+				}
+				accept = 'accept="' + accept.join(',') + '"';
+			} else {
+				accept = '';
+			}
+
 			var iframe = document.createElement('iframe');
 			iframe.id = frameId;
 			iframe.name = frameId;
@@ -2643,7 +2676,16 @@ Oktell = (function(){
 			input.type = 'file';
 			input.id = inputId
 			input.name = 'file';
+			input.accept =  accept;
 			form.appendChild(input);
+
+			var callCallback = function(data) {
+				var elem;
+				(elem=document.getElementById(frameId)).parentNode.removeChild(elem);
+				(elem=document.getElementById(formId)).parentNode.removeChild(elem);
+				callFunc(callback, data);
+			}
+
 
 			input.onchange = function() {
 				var file = input.value;
@@ -2654,6 +2696,11 @@ Oktell = (function(){
 
 				var fileName = file.replace('\\', '/').split('/');
 				fileName = fileName[fileName.length-1];
+
+				if ( typeof beforeRequest == 'function' && beforeRequest(getSuccessObj({fileName:fileName})) === false ) {
+					callCallback(getErrorObj(3002));
+					return;
+				}
 
 				getHttpQueryPass( true, function(data){
 					if ( data.result ) {
@@ -2669,16 +2716,12 @@ Oktell = (function(){
 
 							path = path[1].replace( /\\/g , '/');
 
-							var elem;
-							(elem=document.getElementById(frameId)).parentNode.removeChild(elem);
-							(elem=document.getElementById(formId)).parentNode.removeChild(elem);
-
-							callFunc(callback, getSuccessObj({path:path}));
+							callCallback(getSuccessObj({path:path}));
 						});
 
-						callFunc(beforeRequest, getSuccessObj({fileName:fileName}));
-
 						form.submit();
+					} else {
+						callCallback(getErrorObj(3001));
 					}
 				});
 			}
