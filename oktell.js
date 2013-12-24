@@ -4565,12 +4565,13 @@ Oktell = (function(){
 			var iAmAbonent = isConf && phone.isAbonent( oktellInfo.userid );
 			var iAmCreator = isConf && iAmAbonent && iAmAbonent.isConferenceCreator;
 			var phoneState = phone.state();
+			var intercomSupport = phone.intercomSupport;
 
 			if ( isInQueue ) {
 
 			} else if ( isMe ) {
 				if ( phoneState != phone.states.DISCONNECTED && phoneState != phone.states.READY ) {
-					if ( phone.sipActive ) {
+					if ( ( phoneState == phone.states.RING || phoneState == phone.states.BACKRING ) && ( phone.sipActive || intercomSupport !== false ) ) {
 						a.push('answer');
 					}
 					a.push('endCall');
@@ -4607,7 +4608,7 @@ Oktell = (function(){
 						a.push('ghostListen', 'ghostHelp', 'ghostConference');
 					}
 				} else if ( abonent ) {
-					if ( phone.sipActive && phoneState == phone.states.RING ) {
+					if ( phoneState == phone.states.RING && ( phone.sipActive || intercomSupport !== false ) ) {
 						a.push('answer');
 					}
 					if ( isConf ) {
