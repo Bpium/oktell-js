@@ -1,6 +1,6 @@
 /*
  * Oktell.js
- * version 1.7.0
+ * version 1.7.1
  * http://js.oktell.ru/
  */
 
@@ -3245,7 +3245,7 @@ Oktell = (function(){
 					callFunc(callback, getSuccessObj()); // TODO check answer result for callback
 				} else if ( self.intercomSupport === false ) {
 					callFunc(callback, getErrorObj(2902));
-				} else if ( self.state() == self.states.RING ) {
+				} else if ( self.state() == self.states.RING || self.state() == self.states.BACKRING ) {
 					sendOktell('pbxanswercall');
 					afterTimer = function(){
 						clearInterval(checkInterval);
@@ -3253,7 +3253,7 @@ Oktell = (function(){
 						callFunc(callback, getReturnObj(self.intercomSupport, {}, 2902));
 					}
 					checkIntercomSupport = function(){
-						return self.intercomSupport = self.state() == self.states.TALK;
+						return self.intercomSupport = ( self.state() == self.states.TALK || self.state() == self.states.CALL );
 					}
 					checkInterval = setInterval(function(){
 						if ( checkIntercomSupport() ) {
@@ -4543,7 +4543,7 @@ Oktell = (function(){
 		pa['-'] = {}
 		pa[phone.states.DISCONNECTED] = {};
 		pa[phone.states.BACKCALL] = { endCall: 1 };
-		pa[phone.states.BACKRING] = { endCall: 1 };
+		pa[phone.states.BACKRING] = { endCall: 1, answer: 1 };
 		pa[phone.states.CALL] = { endCall: 1, conference: 1, call: 1, intercom: 1, transfer: 1 };
 		pa[phone.states.READY] = { conference: 1, call: 1, intercom: 1, ghostListen: 1, ghostHelp: 1, ghostConference: 1, transfer: 1, toggle: 1, endCall: 1, resume: 1 };
 		pa[phone.states.RING] = { endCall: 1, answer: 1 };
@@ -4659,7 +4659,7 @@ Oktell = (function(){
 						a.push('ghostListen', 'ghostHelp', 'ghostConference');
 					}
 				} else if ( abonent ) {
-					if ( phoneState == phone.states.RING && ( phone.sipActive || intercomSupport !== false ) ) {
+					if ( ( phoneState == phone.states.RING || phoneState == phone.states.BACKRING ) && ( phone.sipActive || intercomSupport !== false ) ) {
 						a.push('answer');
 					}
 					if ( isConf ) {
@@ -5320,7 +5320,7 @@ Oktell = (function(){
 
 		}
 
-		self.version = '1.7.0';
+		self.version = '1.7.1';
 
 	};
 	extend( Oktell.prototype , Events );
