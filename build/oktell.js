@@ -2240,7 +2240,9 @@ Oktell = (function(){
 					}
 				}
 			}
-			server.unbindOktellEvent( eventNames, callback );
+			if ( server ) {
+				server.unbindOktellEvent(eventNames, callback);
+			}
 		}
 
 		/**
