@@ -3190,7 +3190,7 @@ Oktell = (function(){
 			},
 
 
-			setSipphone: function(sip) {
+			setSipPhone: function(sip) {
 				var that = this;
 				that.sip = sip;
 				that.sip.on('connect', function(){
@@ -4864,7 +4864,7 @@ Oktell = (function(){
 											sipPnoneActive = true;
 											self.trigger('webphoneDisconnect');
 										});
-										phone.setSipphone(sipPhone);
+										phone.setSipPhone(sipPhone);
 									}
 								}, 200);
 							}
