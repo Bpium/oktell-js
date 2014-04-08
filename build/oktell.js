@@ -4734,6 +4734,7 @@ Oktell = (function(){
 				oktellOptions.Password = md5( utf8DecodePass( options.password.toString() ) );
 			} else {
 				oktellOptions.password = undefined;
+				oktellOptions.Password = undefined;
 			}
 
 
