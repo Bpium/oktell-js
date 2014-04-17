@@ -1692,7 +1692,7 @@ Oktell = (function(){
 				callbacks[id] = callback;
 			}
 			if ( self.delayMin > 0 ) {
-				timeout = self.delayMin;
+				var timeout = self.delayMin;
 				if ( delayMax ) {
 					timeout = Math.round( Math.random() * Math.abs(self.delayMax - self.delayMin) + self.delayMin );
 				}
