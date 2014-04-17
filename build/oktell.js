@@ -1273,8 +1273,17 @@ Oktell = (function(){
 				openTimeout: 10000,
 				queryTimeout: 20000,
 				queueInterval: 5000,
-				oktellVoice: false
+				oktellVoice: false,
+				crmName: false,
+				crmCompanyId: false
 			},
+			crmMode = false,
+			crmName = false,
+			crmId = false,
+			crmCompanyId = false,
+			crmNamePrefix = false,
+			crmNumberPrefix = false,
+			wsLogin = '',
 			oktellVoice,
 			sipPhone,
 			sipPnoneActive = false,
@@ -1462,6 +1471,8 @@ Oktell = (function(){
 			1213: 'no password or session',
 			1214: 'max online users count reached, license limitation',
 			1215: 'oktell service is not available',
+			12015: 'crm procedures not allowed in websock.config',
+			12016: 'crm procedure crm_getcrmid exec error',
 			// call
 			2001: 'user state - disconnected',
 			2002: 'phone not connected',
@@ -1625,7 +1636,7 @@ Oktell = (function(){
 			if ( serverConnected() ) {
 				if ( isValidMethodVersion(method) ) {
 					params = size(params) ? params : {};
-					var params = extend({ userlogin: oktellInfo.login }, params );
+					var params = extend({ userlogin: wsLogin }, params );
 					var errorTimer;
 					if ( typeof callbackFn == 'function' ) {
 						var errorTimer = setTimeout(function(){
@@ -1681,7 +1692,7 @@ Oktell = (function(){
 				if ( oktellInfo.allowedProcedures[method.toLowerCase()] ) {
 					var p = {
 						userid: oktellInfo.userid,
-						userlogin: oktellInfo.login,
+						userlogin: wsLogin,
 						inputparams: params || {}
 					};
 					log('>>>> ' + method, p);
@@ -1742,7 +1753,7 @@ Oktell = (function(){
 			triggerCustomEvent: function( eventName, recipientsArr, data, sendBack ) {
 				sendOktell( 'triggercustomevent', {
 					userid: oktellInfo.userid,
-					userlogin: oktellInfo.login,
+					userlogin: wsLogin,
 					eventname: eventName,
 					eventparam: data,
 					recipients: recipientsArr,
@@ -1759,14 +1770,15 @@ Oktell = (function(){
 		 * @param callback
 		 */
 		var loadUsers = function(callback){
-			sendOktell('getallusernumbers', { fillsubordinates: true }, function(data){
-				if ( data.result && data.users ) {
-					each(data.users, function(u){
+			var afterLoad = function(data){
+				if ( data.result ) {
+					var dUsers = data.users || data.datasets && data.datasets[0];
+					each(dUsers, function(u){
 						users[ u.id ] = {
 							id: u.id,
 							name: u.name,
 							number: u.main || undefined,
-							numbers: u.nums || [],
+							numbers: ( typeof u.nums == 'string' ? u.nums.split(',') : u.nums ) || [],
 							//controlMe: u.controlMe ? true : false,
 							controlledByMe: u.sub ? true : false
 						};
@@ -1794,7 +1806,12 @@ Oktell = (function(){
 				} else {
 					callFunc(callback);
 				}
-			});
+			}
+			if ( crmMode ) {
+				exec('crm_getallusernumbers', {'@authorizeduserid': oktellInfo.userid }, afterLoad);
+			} else {
+				sendOktell('getallusernumbers', { fillsubordinates: true }, afterLoad);
+			}
 		};
 
 		/**
@@ -1819,15 +1836,21 @@ Oktell = (function(){
 		 * @param callback
 		 */
 		var loadPbxNumbers = function(callback) {
-			sendOktell('getpbxnumbers', {mode:'full'}, function(data){
-				if ( data.result && data.numbers ) {
-					each(data.numbers, function(n){
+			var afterLoad = function(data){
+				if ( data.result ) {
+					var dataNumbers = data.numbers || data.datasets && data.datasets[0];
+					each(dataNumbers, function(n){
 						numbers[ n.number ] = n;
 						numbersById[ n.id ] = numbers[ n.number ];
 					});
 				}
 				callFunc(callback);
-			});
+			}
+			if ( crmMode ) {
+				exec('crm_getpbxnumbers', {'@authorizeduserid': oktellInfo.userid }, afterLoad);
+			} else {
+				sendOktell('getpbxnumbers', {mode:'full'}, afterLoad);
+			}
 		};
 
 		/**
@@ -3422,7 +3445,7 @@ Oktell = (function(){
 				var that = this;
 				var confId = newGuid();
 				var room = Math.round( Math.random() * 10000 );
-				var numParam = [{ userlogin: oktellInfo.login }];
+				var numParam = [{ userlogin: wsLogin }];
 				numbers = toStringsArray(numbers);
 				if ( isArray( numbers ) ) {
 					each( numbers, function(n) {
@@ -4099,6 +4122,17 @@ Oktell = (function(){
 
 			extend( oktellOptions, options );
 			debugMode = oktellOptions.debugMode;
+
+			if ( oktellOptions.crmName && oktellOptions.crmCompanyId ) {
+				crmMode = true;
+				crmName = oktellOptions.crmName;
+				crmCompanyId = oktellOptions.crmCompanyId;
+				crmNamePrefix = crmName + '_' + crmCompanyId + '_';
+				wsLogin = crmNamePrefix + oktellOptions.login;
+			} else {
+				wsLogin = oktellOptions.login;
+			}
+
 			oktellVoice = false
 			if ( oktellOptions.oktellVoice ) {
 				if ( oktellOptions.oktellVoice.isOktellVoice === true ) {
@@ -4276,82 +4310,107 @@ Oktell = (function(){
 									if ( ! isValidMethodVersion('pbxanswercall') ) {
 										phone.intercomSupport = false;
 									}
+									var afterGetVersion = function(){
+										sendOktell('getmyuserinfo', {}, function(data){
+											if ( data.result ) {
+												oktellInfo.number = data.mainpbxnumber;
+												oktellInfo.username = data.username;
+												oktellInfo.hasline = data.hasline;
+												oktellInfo.lineid = data.lineid;
+												oktellInfo.linenumber = data.linenumber;
+												oktellInfo.isoperator = data.isoperator;
+												userStates.loadBreakReasons(function(data){
+													userStates.loadState(function(result){
+														if ( result ) {
+															userStates.checkUserRedirect(function(result){
+																loadPbxNumbers(function(){
 
-									sendOktell('getmyuserinfo', {}, function(data){
-										if ( data.result ) {
-											oktellInfo.number = data.mainpbxnumber;
-											oktellInfo.username = data.username;
-											oktellInfo.hasline = data.hasline;
-											oktellInfo.lineid = data.lineid;
-											oktellInfo.linenumber = data.linenumber;
-											oktellInfo.isoperator = data.isoperator;
-											userStates.loadBreakReasons(function(data){
-												userStates.loadState(function(result){
-													if ( result ) {
-														userStates.checkUserRedirect(function(result){
-															loadPbxNumbers(function(){
-
-																server.bindOktellEvent( 'pbxnumberstatechanged', function( data ){
-																	for( var i = 0; i < data.numbers.length; i++ ) {
-																		var n = numbers[ data.numbers[i].num ];
-																		if ( n ) {
-																			n.state = data.numbers[i].numstateid;
+																	server.bindOktellEvent( 'pbxnumberstatechanged', function( data ){
+																		for( var i = 0; i < data.numbers.length; i++ ) {
+																				if ( crmMode && crmNumberPrefix ) {
+																					data.numbers[i].num = data.numbers[i].num.toString().replace(new RegExp('^'+crmNumberPrefix), '')
+																				}
+																			var n = numbers[ data.numbers[i].num ];
+																			if ( n ) {
+																				n.state = data.numbers[i].numstateid;
+																			}
 																		}
-																	}
-																});
+																	});
 
-																loadUsers(function(){
-																	phone.loadStates(function(result){
-																		if ( result ) {
-																			loginError = false;
-																			events.trigger('login');
-																			server.bindOktellEvent('httpresponsecopy',function(data){
-																				var result = data.response;
-																				if ( result == '200 OK') {
-																					var pass = data.password;
-																					var content = data.content;
-																					if ( httpQueryData[pass] && typeof httpQueryData[pass].callback == 'function' ) {
-																						httpQueryData[pass].callback(content);
+																	loadUsers(function(){
+																		phone.loadStates(function(result){
+																			if ( result ) {
+																				loginError = false;
+																				events.trigger('login');
+																				server.bindOktellEvent('httpresponsecopy',function(data){
+																					var result = data.response;
+																					if ( result == '200 OK') {
+																						var pass = data.password;
+																						var content = data.content;
+																						if ( httpQueryData[pass] && typeof httpQueryData[pass].callback == 'function' ) {
+																							httpQueryData[pass].callback(content);
+																						}
+																					}
+																				});
+																				callFunc( oktellOptions.callback, getSuccessObj() );
+																				oktellConnected(true);
+
+																				for (var i = 0; i < nativeEventsForBindAfterConnect.length; i++) {
+																					var obj = nativeEventsForBindAfterConnect[i];
+																					if ( obj && obj.eventName && obj.callback && ! obj.binded ) {
+																						obj.binded = true;
+																						server.bindOktellEvent(obj.eventName, obj.callback);
 																					}
 																				}
-																			});
-																			callFunc( oktellOptions.callback, getSuccessObj() );
-																			oktellConnected(true);
 
-																			for (var i = 0; i < nativeEventsForBindAfterConnect.length; i++) {
-																				var obj = nativeEventsForBindAfterConnect[i];
-																				if ( obj && obj.eventName && obj.callback && ! obj.binded ) {
-																					obj.binded = true;
-																					server.bindOktellEvent(obj.eventName, obj.callback);
-																				}
+																				self.trigger('connect');
+																			} else {
+																				callFunc( oktellOptions.callback, getLoginErrorObj(1207) );
+																				self.trigger('connectError', getLoginErrorObj(1207) );
+																				disconnect(14);
 																			}
-
-																			self.trigger('connect');
-																		} else {
-																			callFunc( oktellOptions.callback, getLoginErrorObj(1207) );
-																			self.trigger('connectError', getLoginErrorObj(1207) );
-																			disconnect(14);
-																		}
+																		});
 																	});
 																});
 															});
-														});
-													} else {
-														callFunc( oktellOptions.callback, getLoginErrorObj(1209) );
-														self.trigger('connectError', getLoginErrorObj(1209) );
-														disconnect(14);
-													}
+														} else {
+															callFunc( oktellOptions.callback, getLoginErrorObj(1209) );
+															self.trigger('connectError', getLoginErrorObj(1209) );
+															disconnect(14);
+														}
+													});
 												});
+											} else {
+												callFunc( oktellOptions.callback, getLoginErrorObj(1210) );
+												self.trigger('connectError', getLoginErrorObj(1210) );
+												disconnect(14);
+											}
+										});
+									}
+									if ( crmMode && crmNamePrefix ) {
+										if ( oktellInfo.allowedProcedures['crm_getcrmid'] && oktellInfo.allowedProcedures['crm_getpbxnumbers'] && oktellInfo.allowedProcedures['crm_getallusernumbers'] ) {
+											exec('crm_getcrmid', {'@authorizeduserid': oktellInfo.userid, '@crmname': crmName }, function(data){
+												if ( data.result && data.datasets && data.datasets[0] && data.datasets[0][0].crmid ) {
+													crmId = data.datasets[0][0].crmid;
+													crmNumberPrefix = crmName + crmId;
+													afterGetVersion();
+												} else {
+													callFunc( oktellOptions.callback, getLoginErrorObj(1206 ) );
+													self.trigger('connectError', getLoginErrorObj(1206) );
+													disconnect(11);
+												}
 											});
 										} else {
-											callFunc( oktellOptions.callback, getLoginErrorObj(1210) );
-											self.trigger('connectError', getLoginErrorObj(1210) );
-											disconnect(14);
+											callFunc( oktellOptions.callback, getErrorObj(1215 ) );
+											self.trigger('connectError', getErrorObj(1215) );
+											disconnect(11);
 										}
-									});
+									} else {
+										afterGetVersion();
+									}
 								} else {
-									callFunc( oktellOptions.callback, getLoginErrorObj(1206 ) );
-									self.trigger('connectError', getLoginErrorObj(1206) );
+									callFunc( oktellOptions.callback, getErrorObj(1206 ) );
+									self.trigger('connectError', getErrorObj(1206) );
 									disconnect(11);
 								}
 							});
