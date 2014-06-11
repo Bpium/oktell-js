@@ -4625,7 +4625,7 @@ Oktell = (function(){
 				}
 			} else if ( ! obj || ( obj && obj.state !== undefined && obj.state != 0 ) ) {
 				if ( hold ) {
-					if ( phone.sipActive && phoneState == phone.states.READY ) {
+					if ( phone.sipActive && phone.sip && typeof phone.sip.isOnHold === "function" && phone.sip.isOnHold() ) {
 						a.push('resume');
 					} else {
 						a.push('toggle', 'endCall'); // toogle and connect current with hold, and disconnect myself

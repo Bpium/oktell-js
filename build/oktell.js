@@ -1698,7 +1698,7 @@ Oktell = (function(){
 				callbacks[id] = callback;
 			}
 			if ( self.delayMin > 0 ) {
-				timeout = self.delayMin;
+				var timeout = self.delayMin;
 				if ( delayMax ) {
 					timeout = Math.round( Math.random() * Math.abs(self.delayMax - self.delayMin) + self.delayMin );
 				}
@@ -3196,7 +3196,7 @@ Oktell = (function(){
 			},
 
 
-			setSipphone: function(sip) {
+			setSipPhone: function(sip) {
 				var that = this;
 				that.sip = sip;
 				that.sip.on('connect', function(){
@@ -4631,7 +4631,7 @@ Oktell = (function(){
 				}
 			} else if ( ! obj || ( obj && obj.state !== undefined && obj.state != 0 ) ) {
 				if ( hold ) {
-					if ( phone.sipActive && phoneState == phone.states.READY ) {
+					if ( phone.sipActive && phone.sip && typeof phone.sip.isOnHold === "function" && phone.sip.isOnHold() ) {
 						a.push('resume');
 					} else {
 						a.push('toggle', 'endCall'); // toogle and connect current with hold, and disconnect myself
@@ -4870,7 +4870,7 @@ Oktell = (function(){
 											sipPnoneActive = true;
 											self.trigger('webphoneDisconnect');
 										});
-										phone.setSipphone(sipPhone);
+										phone.setSipPhone(sipPhone);
 									}
 								}, 200);
 							}
