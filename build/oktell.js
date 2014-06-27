@@ -4549,7 +4549,7 @@ Oktell = (function(){
 		pa[phone.states.CALL] = { endCall: 1, conference: 1, call: 1, intercom: 1, transfer: 1 };
 		pa[phone.states.READY] = { conference: 1, call: 1, intercom: 1, ghostListen: 1, ghostHelp: 1, ghostConference: 1, transfer: 1, toggle: 1, endCall: 1, resume: 1 };
 		pa[phone.states.RING] = { endCall: 1, answer: 1 };
-		pa[phone.states.TALK] = { endCall: 1, conference: 1, call: 1, resume: 1, hold: 0, intercom: 1, toggle: 1, transfer: 1, ghostListen: 1, ghostHelp: 1, ghostConference: 1 };
+		pa[phone.states.TALK] = { endCall: 1, conference: 1, call: 1, resume: 1, hold: 1, intercom: 1, toggle: 1, transfer: 1, ghostListen: 1, ghostHelp: 1, ghostConference: 1 };
 		//pa[phone.states.CALLWEBPHONE] = { };
 
 		/**
@@ -4562,7 +4562,7 @@ Oktell = (function(){
 		pau[userStates.states.READY] = {endCall: 1, conference: 1, call: 1, intercom: 1, toggle: 1, transfer: 1, resume: 1, ghostListen: 1, ghostHelp: 1, ghostConference: 1, resume:1};
 		pau[userStates.states.BREAK] = {endCall: 1, call: 1, intercom: 1, toggle: 1, transfer: 1, ghostListen: 1, resume: 1, ghostHelp: 1, ghostConference: 1};
 		pau[userStates.states.OFF] = {endCall: 1, conference: 1, call: 1, intercom: 1, toggle: 1, transfer: 1, resume: 1, ghostListen: 1, ghostHelp: 1, ghostConference: 1};
-		pau[userStates.states.BUSY] = {answer: 1, endCall: 1, conference: 1, call: 1, intercom: 1, toggle: 1, transfer: 1, resume: 1, hold: 0, ghostListen: 1, ghostHelp: 1, ghostConference: 1};
+		pau[userStates.states.BUSY] = {answer: 1, endCall: 1, conference: 1, call: 1, intercom: 1, toggle: 1, transfer: 1, resume: 1, hold: 1, ghostListen: 1, ghostHelp: 1, ghostConference: 1};
 		pau[userStates.states.RESERVED] = {};
 		pau[userStates.states.NOPHONE] = {};
 
