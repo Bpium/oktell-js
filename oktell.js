@@ -2087,6 +2087,7 @@ Oktell = (function(){
 			1212: 'error connect using session',
 			1213: 'no password or session',
 			1214: 'max online users count reached, license limitation',
+			1215: 'oktell service is not available',
 			// call
 			2001: 'user state - disconnected',
 			2002: 'phone not connected',
@@ -4817,6 +4818,8 @@ Oktell = (function(){
 								errorCode = 1204; // Пользователь уже зарегистрирован
 							} else if ( data.error == 50025 ) {
 								errorCode = 1214; // Количество пользователей, одновременно работающих с системой, ограничено лицензией
+							} else if ( data.errormsg == "Service not available" ) {
+								errorCode = 1215; // служба октела недозагрулась
 							} else if( data.errormsg == "Wrong login/pass combination" ) {
 								cookie(cookieSessionName, null);
 								localStorage && (delete localStorage[cookieSessionName]);
