@@ -2590,6 +2590,9 @@ Oktell = (function(){
 					that.sipHasRTCSession = false;
 					that.loadStates();
 				});
+				that.sip.on('RTCSessionFailed', function(){
+					that.sipHasRTCSession = false;
+				});
 				that.sip.on('sessionClose', function(){
 					that.sipHasRTCSession = false;
 					that.loadStates();
