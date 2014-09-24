@@ -4245,9 +4245,15 @@ Oktell = (function(){
 							sendOktell('getversion', {showalloweddbstoredprocs:1}, function(data){
 
 								if ( data.result ) {
-									oktellInfo.oktellBuild = data.version.build;
 									oktellInfo.oktellDated = data.version.dated;
-									oktellInfo.allowedProcedures = data.alloweddbstoredprocs || {};
+                                    oktellInfo.oktellBuild = data.version.build;
+
+                                    // поддержка нескольких бетта-версий октелл, где вместо версии 2.11.1.140905 приходит 2.11.xxxx.xxxxx
+                                    if ( oktellInfo.oktellDated < 140918 && /2\.11\.[0-9]{4}\.[0-9]{5}/g.test(oktellInfo.oktellBuild) ){
+                                        oktellInfo.oktellBuild = "2.11.1." + oktellInfo.oktellDated
+                                    }
+
+                                    oktellInfo.allowedProcedures = data.alloweddbstoredprocs || {};
 									oktellInfo.oktellWebServerPort = data.version.webserverport;
 									oktellInfo.oktellWebServerLink = getWebServerLink();
 									if ( ! isValidMethodVersion('pbxanswercall') ) {
