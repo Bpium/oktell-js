@@ -1,6 +1,6 @@
 {
-	"name": "oktell-voice",
-	"version": "0.2.0",
+	"name": "oktelljs",
+	"version": "1.7.1",
 	"dependencies": {},
 	"devDependencies": {
 		"grunt-concurrent": "~0.4.2",

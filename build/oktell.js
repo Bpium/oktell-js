@@ -2540,6 +2540,11 @@ Oktell = (function(){
 		var phone = {
 
 			_conferenceInfo: {},
+
+			// from this version oktell has 'number' param for 'createconference' method for 
+			// all phone numbers, server decides, is it external or internal
+			_oktellDatedWithConfNumber: 140929,
+			
 			_holdNumber: false,
 			_conferenceId: false,
 			abonentList: {},
@@ -3424,7 +3429,11 @@ Oktell = (function(){
 						if ( isGuid(n) ) {
 							numParam.push({ userid: n });
 						} else {
-							numParam.push({ intnumber: n });
+							if ( oktellInfo.oktellDated >= that._oktellDatedWithConfNumber ) {
+								numParam.push({ number: n });
+							} else {
+								numParam.push({ intnumber: n });								
+							}
 						}
 					});
 				}
@@ -3481,7 +3490,7 @@ Oktell = (function(){
 								if ( isGuid(n) ) {
 									numParam.push({ userid: n });
 								} else {
-									numParam.push({ intnumber: n });
+									numParam.push({ number: n });								
 								}
 							}
 						}
