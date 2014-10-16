@@ -4232,6 +4232,7 @@ Oktell = (function(){
 										login: data.sipuser,
 										password: data.sippass,
 										server: url.replace(/w[s]{1,2}:\/\//, '').replace('/', '').split(':')[0] + ':' + data.sipport,
+										useWSS: data.sipsecure,
 										debugMode: debugMode
 									});
 									if ( sipPhone ) {
@@ -4250,6 +4251,7 @@ Oktell = (function(){
 									}
 								}, 200);
 							}
+
 							oktellInfo.userid = data.userid;
 							oktellInfo.sessionId = data.sessionid;
 							if (oktellInfo.sessionId) {
@@ -4274,6 +4276,7 @@ Oktell = (function(){
 									if ( ! isValidMethodVersion('pbxanswercall') ) {
 										phone.intercomSupport = false;
 									}
+
 									sendOktell('getmyuserinfo', {}, function(data){
 										if ( data.result ) {
 											oktellInfo.number = data.mainpbxnumber;
