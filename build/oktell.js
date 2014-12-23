@@ -1276,7 +1276,7 @@ Oktell = (function(){
         queueInterval: 5000,
         oktellVoice: false
       },
-      oktellVoice,
+      webphoneAuthData = null,
       sipPhone,
       sipPnoneActive = false,
       oktellInfo = {
@@ -2585,6 +2585,9 @@ Oktell = (function(){
 
       setSipPhone: function(sip) {
         var that = this;
+        if ( that.sip ) {
+          that.sip.off();
+        }
         that.sip = sip;
         that.sip.on('connect', function(){
           that.sipActive = true;
@@ -3962,6 +3965,103 @@ Oktell = (function(){
         if ( this.state() === this.states.TALK && this.getHoldInfo().hasHold && this.sipActive ) {
           this.endCall();
         }
+      },
+
+      enableWebphone: function(oktellVoice, callback) {
+        var oktellVoice = oktellVoice || window.oktellVoice;
+        if ( !oktellVoice || !oktellVoice.connect ) {
+          return false;
+        }
+
+        if ( sipPhone ) {
+          this.disableWebphone();
+        }
+
+        function connectSip(options) {
+          log('connecting webphone', options);
+          var result;
+          try {
+            sipPhone = oktellVoice.connect({
+              login: options.user,
+              password: options.pass,
+              server: options.url.replace(/w[s]{1,2}:\/\//, '').replace('/', '').split(':')[0] + ':' + options.port,
+              useWSS: options.secure,
+              debugMode: debugMode
+            });
+          } catch (e) {
+            sipPhone = null;
+            result = false;
+          }
+
+          if ( sipPhone ) {
+            sipPhone.on('connect', function(){
+              sipPnoneActive = true;
+              self.trigger('webphoneConnect');
+            });
+            sipPhone.on('all', function(event){
+              log('Oktell webphone event: ' + event, arguments);
+            });
+            sipPhone.on('disconnect', function(){
+              sipPnoneActive = false;
+              self.trigger('webphoneDisconnect');
+            });
+            phone.setSipPhone(sipPhone);
+            result = true;
+          } else {
+            result = false;
+          }
+
+          callFunc(callback, result);
+        }
+
+        if ( webphoneAuthData ) {
+          setTimeout(function(){
+            connectSip(webphoneAuthData);
+          });
+        } else {
+          var server = new Server( oktellInfo.currentUrl, oktellOptions.openTimeout,
+                oktellOptions.queryDelayMin, oktellOptions.queryDelayMax, function(url){
+
+            server.sendOktell('login', {
+              userlogin: oktellInfo.login,
+              Password: oktellOptions.Password,
+              password: oktellOptions.password,
+              sessionid: oktellInfo.sessionId || undefined,
+              expires: oktellOptions.expires || undefined,
+              showid: 1,
+              usewebrtc: true,
+              workplace: oktellOptions.workplace || undefined,
+
+            }, function(data){
+              if ( data.result && data.sipuser && data.sippass && data.sipport ) {
+                oktellVoice.createUserMedia(function(){
+                  connectSip({
+                    user: data.sipuser,
+                    pass: data.sippass,
+                    url: oktellInfo.currentUrl,
+                    port: data.sipport,
+                    secure: data.sipsecure
+                  });
+                }, function(){
+                  callFunc(callback, false);
+                });
+              }
+              server.disconnect();
+            });
+          });
+
+          server.on('errorConnection', function(data){
+            callFunc(callback, result);
+          });
+          server.multiConnect();
+        }
+
+      },
+
+      disableWebphone: function() {
+        if ( sipPhone ) {
+          sipPhone.disconnect();
+        }
       }
     };
     extend( phone, Events );
@@ -3980,6 +4080,8 @@ Oktell = (function(){
     exportApi('hold', phone.hold, phone);
     exportApi('resume', phone.resume, phone);
     exportApi('commutate', phone.commutate, phone);
+    exportApi('enableWebphone', phone.enableWebphone, phone);
+    exportApi('disableWebphone', phone.disableWebphone, phone);
 //    exportApi('getPhoneState', phone.apiGetPhoneState, phone);
 
 
@@ -4179,6 +4281,11 @@ Oktell = (function(){
         }
       }
 
+      function callConnectCallback(result) {
+        callFunc(oktellOptions.callback, result);
+        oktellOptions.callback = null;
+      }
+
       var sessionId = cookie(cookieSessionName) || ( localStorage && localStorage[cookieSessionName] );
 
       if ( options.password !== undefined && options.password !== null ) {
@@ -4223,7 +4330,7 @@ Oktell = (function(){
         }
         oktellOptions.url = links;
       } else {
-        callFunc( oktellOptions.callback, getErrorObj(1205) );
+        callConnectCallback( getErrorObj(1205) );
         self.trigger('connectError', getErrorObj(1205) );
         return false;
       }
@@ -4237,7 +4344,7 @@ Oktell = (function(){
       var currentUrlIndex = 0;
 
       if ( ! sessionId && ( oktellOptions.password === undefined || oktellOptions.password === null ) ) {
-        callFunc( oktellOptions.callback, getErrorObj(1213) );
+        callConnectCallback( getErrorObj(1213) );
         self.trigger('connectError', getErrorObj(1213) );
         return false;
       }
@@ -4245,6 +4352,7 @@ Oktell = (function(){
       var createServer = function() {
         server = new Server( oktellOptions.url, oktellOptions.openTimeout, oktellOptions.queryDelayMin, oktellOptions.queryDelayMax, function(url){
           //alert(url);
+          //
           loginError = false;
           oktellInfo.currentUrl = server.url; //oktellOptions.url[currentUrlIndex];
           sendOktell('login', {
@@ -4252,7 +4360,7 @@ Oktell = (function(){
             password: oktellOptions.password,
             sessionid: sessionId || undefined,
             showid: 1,
-            usewebrtc: oktellVoice ? true : false,
+            usewebrtc: !!oktellOptions.oktellVoice,
             workplace: oktellOptions.workplace || undefined,
             expires: oktellOptions.expires || undefined
           }, function(data){
@@ -4280,7 +4388,7 @@ Oktell = (function(){
                 localStorage && (delete localStorage[cookieSessionName]);
                 errorCode = 1212;
               }
-              callFunc( oktellOptions.callback, getLoginErrorObj(errorCode) );
+              callConnectCallback( getLoginErrorObj(errorCode) );
               self.trigger('connectError', getLoginErrorObj(errorCode) );
               disconnect(14, false, false);
             } else if (data.result == 1) {
@@ -4298,30 +4406,19 @@ Oktell = (function(){
                 userStates.saveStatesFromServer(data);
               });
 
-              if ( oktellVoice ) {
+              if ( data.sipuser && data.sippass && data.sipport ) {
+                webphoneAuthData = {
+                  user: data.sipuser,
+                  pass: data.sippass,
+                  url: oktellInfo.currentUrl,
+                  port: data.sipport,
+                  secure: data.sipsecure
+                }
                 setTimeout(function(){
-                  sipPhone = oktellVoice.connect({
-                    login: data.sipuser,
-                    password: data.sippass,
-                    server: url.replace(/w[s]{1,2}:\/\//, '').replace('/', '').split(':')[0] + ':' + data.sipport,
-                    useWSS: data.sipsecure,
-                    debugMode: debugMode
-                  });
-                  if ( sipPhone ) {
-                    sipPhone.on('connect', function(){
-                      sipPnoneActive = true;
-                      self.trigger('webphoneConnect');
-                    });
-                    sipPhone.on('all', function(event){
-                      log('Oktell webphone event: ' + event, arguments);
-                    });
-                    sipPhone.on('disconnect', function(){
-                      sipPnoneActive = true;
-                      self.trigger('webphoneDisconnect');
-                    });
-                    phone.setSipPhone(sipPhone);
-                  }
+                  phone.enableWebphone();
                 }, 200);
+              } else {
+                webphoneAuthData = null;
               }
 
               oktellInfo.userid = data.userid;
@@ -4335,14 +4432,14 @@ Oktell = (function(){
 
                 if ( data.result ) {
                   oktellInfo.oktellDated = data.version.dated;
-                                    oktellInfo.oktellBuild = data.version.build;
+                  oktellInfo.oktellBuild = data.version.build;
 
-                                    // поддержка нескольких бетта-версий октелл, где вместо версии 2.11.1.140905 приходит 2.11.xxxx.xxxxx
-                                    if ( oktellInfo.oktellDated < 140918 && /2\.11\.[0-9]{4}\.[0-9]{5}/g.test(oktellInfo.oktellBuild) ){
-                                        oktellInfo.oktellBuild = "2.11.1." + oktellInfo.oktellDated
-                                    }
+                  // поддержка нескольких бетта-версий октелл, где вместо версии 2.11.1.140905 приходит 2.11.xxxx.xxxxx
+                  if ( oktellInfo.oktellDated < 140918 && /2\.11\.[0-9]{4}\.[0-9]{5}/g.test(oktellInfo.oktellBuild) ){
+                      oktellInfo.oktellBuild = "2.11.1." + oktellInfo.oktellDated
+                  }
 
-                                    oktellInfo.allowedProcedures = data.alloweddbstoredprocs || {};
+                  oktellInfo.allowedProcedures = data.alloweddbstoredprocs || {};
                   oktellInfo.oktellWebServerPort = data.version.webserverport;
                   oktellInfo.oktellWebServerLink = getWebServerLink();
                   if ( ! isValidMethodVersion('pbxanswercall') ) {
@@ -4387,7 +4484,7 @@ Oktell = (function(){
                                           }
                                         }
                                       });
-                                      callFunc( oktellOptions.callback, getSuccessObj() );
+                                      callConnectCallback( getSuccessObj() );
                                       oktellConnected(true);
 
                                       for (var i = 0; i < nativeEventsForBindAfterConnect.length; i++) {
@@ -4400,7 +4497,7 @@ Oktell = (function(){
 
                                       self.trigger('connect');
                                     } else {
-                                      callFunc( oktellOptions.callback, getLoginErrorObj(1207) );
+                                      callConnectCallback( getLoginErrorObj(1207) );
                                       self.trigger('connectError', getLoginErrorObj(1207) );
                                       disconnect(14);
                                     }
@@ -4409,20 +4506,20 @@ Oktell = (function(){
                               });
                             });
                           } else {
-                            callFunc( oktellOptions.callback, getLoginErrorObj(1209) );
+                            callConnectCallback( getLoginErrorObj(1209) );
                             self.trigger('connectError', getLoginErrorObj(1209) );
                             disconnect(14);
                           }
                         });
                       });
                     } else {
-                      callFunc( oktellOptions.callback, getLoginErrorObj(1210) );
+                      callConnectCallback( getLoginErrorObj(1210) );
                       self.trigger('connectError', getLoginErrorObj(1210) );
                       disconnect(14);
                     }
                   });
                 } else {
-                  callFunc( oktellOptions.callback, getLoginErrorObj(1206 ) );
+                  callConnectCallback( getLoginErrorObj(1206 ) );
                   self.trigger('connectError', getLoginErrorObj(1206) );
                   disconnect(11);
                 }
@@ -4430,7 +4527,7 @@ Oktell = (function(){
 
 
             } else {
-              callFunc( oktellOptions.callback, getLoginErrorObj(1211) );
+              callConnectCallback( getLoginErrorObj(1211) );
               self.trigger('connectError', getLoginErrorObj(1211) );
               disconnect(14);
             }
@@ -4438,7 +4535,7 @@ Oktell = (function(){
         });
         server.on('errorConnection', function(data){
           self.trigger('connectError', getErrorObj(1200) );
-          callFunc( oktellOptions.callback, getErrorObj(1200) );
+          callConnectCallback( getErrorObj(1200) );
         });
         server.on('connectionClose', function(){
           if ( connectionClosedByUser ) {
@@ -4471,9 +4568,7 @@ Oktell = (function(){
         var obj = nativeEventsForBindAfterConnect[i];
         obj.binded = false;
       }
-      if ( sipPhone && sipPhone.disconnect ) {
-        sipPhone.disconnect();
-      }
+      phone.disableWebphone();
       if ( ! serverConnected() ) {
         if ( typeof reason == 'number' ) {
           reason = getDisconnectReasonObj(reason);
