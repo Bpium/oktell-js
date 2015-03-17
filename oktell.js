@@ -811,10 +811,9 @@ Oktell = (function(){
         }
       }
 
-    }
-    var n_onClose = function(a,b,c){}
-    var n_onError = function(a,b,c){}
-    var n_onError = function(a,b,c){}
+    };
+    var n_onClose = function(a,b,c){};
+    var n_onError = function(a,b,c){};
     var n_wasConnected = false;
     var n_onConnect = function(wsObj) {
       if ( ! n_wasConnected ) {
@@ -832,7 +831,7 @@ Oktell = (function(){
             finalWs.onclose = n_onClose;
             finalWs.onerror = n_onError;
             onOpen()
-          }
+          };
 
           if ( data[0] == 'websocketredirect' ) {
             var wss = new WebSocket( wsObj.url.replace('ws://', 'wss://').replace(':4066', ':443'), 'json');
@@ -842,12 +841,12 @@ Oktell = (function(){
           } else if ( data[1] && data[1].qid == qid ) {
             afterSuccessConnect(wsObj);
           }
-        }
+        };
         ws.send( JSON.stringify(['ping',{qid:qid}]));
       } else {
         wsObj.close();
       }
-    }
+    };
 
     self.n_connect = function() {
       var wsArr = [];
@@ -1331,7 +1330,7 @@ Oktell = (function(){
      * @return {Boolean}
      */
     var serverConnected = function() {
-      if ( server && server.getWebSocketState() == 1 ) {
+      if ( server && server.getWebSocketState() == 1 /* WebSocket.OPEN */ ) {
         return true;
       }
       return false;
@@ -1833,7 +1832,7 @@ Oktell = (function(){
     var getWebServerLink = function() {
       if ( oktellInfo.currentUrl && oktellInfo.oktellWebServerPort ) {
         var protocol = oktellInfo.currentUrl.match(/^wss/) ? "https://" : "http://",
-          host = oktellInfo.currentUrl.match(/wss?:\/\/([^\s\/:]+)/)[1];
+          host = oktellInfo.currentUrl.match(/wss?:\/\/([^\s\/:]+)/)[1],
           port = '';
         if ( ( protocol == 'https://' && self.getMyInfo().oktellWebServerPort != '443' ) || ( protocol == 'http://' && self.getMyInfo().oktellWebServerPort != '80' ) ) {
           port = ':' + self.getMyInfo().oktellWebServerPort;
@@ -1856,7 +1855,7 @@ Oktell = (function(){
           callback: callback
         }
       }
-    }
+    };
     //exportApi('setHttpQueryCallback',setHttpQueryCallback);
 
     /**
@@ -1871,7 +1870,7 @@ Oktell = (function(){
           callFunc(callback, getErrorObj(1103, ' gettemphttppass', data))
         }
       });
-    }
+    };
     //exportApi('getHttpQueryPass',getHttpQueryPass);
 
     /**
@@ -4162,7 +4161,7 @@ Oktell = (function(){
 
       extend( oktellOptions, options );
       debugMode = oktellOptions.debugMode;
-      oktellVoice = false
+      oktellVoice = false;
       if ( oktellOptions.oktellVoice ) {
         if ( oktellOptions.oktellVoice.isOktellVoice === true ) {
           oktellVoice = oktellOptions.oktellVoice
@@ -4173,9 +4172,10 @@ Oktell = (function(){
 
       var sessionId = cookie(cookieSessionName) || ( localStorage && localStorage[cookieSessionName] );
 
-      if ( ! sessionId && options.password !== undefined && options.password !== null ) {
+      if ( options.password !== undefined && options.password !== null ) {
         oktellOptions.password = md5( utf8DecodePass( options.password.toString().toLowerCase() ) );
         oktellOptions.Password = md5( utf8DecodePass( options.password.toString() ) );
+        sessionId = null;
       } else {
         oktellOptions.password = undefined;
         oktellOptions.Password = undefined;
@@ -4198,14 +4198,14 @@ Oktell = (function(){
           }
         }
         return false;
-      }
+      };
 
       if ( typeof oktellOptions.url == 'string' ) {
         oktellOptions.url = [oktellOptions.url];
       }
 
       if ( isArray(oktellOptions.url) ) {
-        var links = []
+        var links = [];
         for ( var i = 0, j = oktellOptions.url.length; i < j; i++ ) {
           if ( typeof oktellOptions.url[i] !== 'string') {
             continue;
@@ -4273,7 +4273,7 @@ Oktell = (function(){
               }
               callFunc( oktellOptions.callback, getLoginErrorObj(errorCode) );
               self.trigger('connectError', getLoginErrorObj(errorCode) );
-              disconnect(14);
+              disconnect(14, false, false);
             } else if (data.result == 1) {
               clearInterval(pingTimer);
               pingTimer = setInterval(function(){
@@ -4455,7 +4455,8 @@ Oktell = (function(){
      * @param silent  - trigger outside 'disconnect' event or not
      * @return {Boolean}
      */
-    var disconnect = function( reason, silent) {
+    var disconnect = function( reason, silent, clearSession ) {
+      clearSession = arguments.length < 3 ? 'auto' : clearSession;
       oktellConnected(false);
       for (var i = 0; i < nativeEventsForBindAfterConnect.length; i++) {
         var obj = nativeEventsForBindAfterConnect[i];
@@ -4472,8 +4473,10 @@ Oktell = (function(){
           self.trigger('disconnect', reason);
         }
       } else {
-        cookie(cookieSessionName, null);
-        localStorage && (delete localStorage[cookieSessionName]);
+        if ( clearSession === 'auto' || clearSession ){
+          cookie(cookieSessionName, null);
+          localStorage && (delete localStorage[cookieSessionName]);
+        }
         connectionClosedByUser = true;
         userStates.state(0);
         phone.state( phone.states.DISCONNECTED );
