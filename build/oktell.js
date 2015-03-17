@@ -1755,11 +1755,18 @@ Oktell = (function(){
     exportApi('offCustomEvent',customEvents.off, customEvents);
     exportApi('onCustomEvent',customEvents.on, customEvents);
 
-    /**
+		var _setUserAvatars = function(user, servPath, data){
+			if ( user ){
+				user['avatarLink'] = data['link'] ? servPath + data['link32x32'] : oktellOptions.defaultAvatar || '';
+				user['avatarLink32x32'] = data['link32x32'] ? servPath + data['link32x32'] : oktellOptions.defaultAvatar32x32 || '';
+				user['avatarLink96x96'] = data['link96x96'] ? servPath + data['link96x96'] : oktellOptions.defaultAvatar64x64 || '';
+			}
+		};
+		/**
      * Load users
      * @param callback
      */
-    var loadUsers = function(callback){
+		var loadUsers = function(callback){
       sendOktell('getallusernumbers', { fillsubordinates: true }, function(data){
         if ( data.result && data.users ) {
           each(data.users, function(u){
@@ -1781,12 +1788,8 @@ Oktell = (function(){
             if ( data.result ) {
               var servPath = getWebServerLink();
               each(data.links, function(data){
-                var user = data.id == oktellInfo.userid ? oktellInfo : users[data.id];
-                if ( user ){
-                  user['avatarLink'] = data['link'] ? servPath + data['link32x32'] : oktellOptions.defaultAvatar || '';
-                  user['avatarLink32x32'] = data['link32x32'] ? servPath + data['link32x32'] : oktellOptions.defaultAvatar32x32 || '';
-                  user['avatarLink96x96'] = data['link96x96'] ? servPath + data['link96x96'] : oktellOptions.defaultAvatar64x64 || '';
-                }
+								_setUserAvatars(users[data.id], servPath, data);
+								if ( data.id == oktellInfo.userid ) _setUserAvatars(oktellInfo, servPath, data);
               });
             }
 
