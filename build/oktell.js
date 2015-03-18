@@ -4275,9 +4275,9 @@ Oktell = (function(){
       oktellVoice = false;
       if ( oktellOptions.oktellVoice ) {
         if ( oktellOptions.oktellVoice.isOktellVoice === true ) {
-          oktellVoice = oktellOptions.oktellVoice
+          oktellVoice = oktellOptions.oktellVoice;
         } else if ( window.oktellVoice && window.oktellVoice.isOktellVoice === true ) {
-          oktellVoice = window.oktellVoice
+          oktellVoice = window.oktellVoice;
         }
       }
 
@@ -4380,12 +4380,10 @@ Oktell = (function(){
               } else if ( data.errormsg == "Service not available" ) {
                 errorCode = 1215; // служба октела недозагрулась
               } else if( data.errormsg == "Wrong login/pass combination" ) {
-                cookie(cookieSessionName, null);
-                localStorage && (delete localStorage[cookieSessionName]);
+                removeUserSession();
                 errorCode = 1202;
               } else if ( data.errormsg == 'Bad request. Session does not exist' || data.errormsg == 'Bad request. Invalid session user' ) {
-                cookie(cookieSessionName, null);
-                localStorage && (delete localStorage[cookieSessionName]);
+                removeUserSession();
                 errorCode = 1212;
               }
               callConnectCallback( getLoginErrorObj(errorCode) );
@@ -4578,13 +4576,14 @@ Oktell = (function(){
         }
       } else {
         if ( clearSession === 'auto' || clearSession ){
-          cookie(cookieSessionName, null);
-          localStorage && (delete localStorage[cookieSessionName]);
+          removeUserSession()
+          sendOktell('logout');
+        } else {
+          server.disconnect();
         }
         connectionClosedByUser = true;
         userStates.state(0);
         phone.state( phone.states.DISCONNECTED );
-        sendOktell('logout');
       }
 
       return true;
@@ -4592,6 +4591,7 @@ Oktell = (function(){
 
     var removeUserSession = function() {
       cookie(cookieSessionName, null);
+      localStorage && (delete localStorage[cookieSessionName]);
       return true;
     };
     exportApi('removeUserSession', removeUserSession);
@@ -4721,8 +4721,8 @@ Oktell = (function(){
      * @param silent - trigger or not 'disconnect' event
      * @return {*}
      */
-    self.disconnect = function(silent) {
-      return disconnect( 13, silent);
+    self.disconnect = function(silent, keepSession) {
+      return disconnect( 13, silent, !keepSession);
     };
 
     /**

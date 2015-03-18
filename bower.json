@@ -9,6 +9,7 @@
   "homepage": "https://github.com/telsystems/oktelljs",
   "private": true,
   "ignore": [
+    "*",
     "**/.*",
     "**/*",
     "!build/**/*",
