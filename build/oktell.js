@@ -4272,14 +4272,6 @@ Oktell = (function(){
 
       extend( oktellOptions, options );
       debugMode = oktellOptions.debugMode;
-      oktellVoice = false;
-      if ( oktellOptions.oktellVoice ) {
-        if ( oktellOptions.oktellVoice.isOktellVoice === true ) {
-          oktellVoice = oktellOptions.oktellVoice;
-        } else if ( window.oktellVoice && window.oktellVoice.isOktellVoice === true ) {
-          oktellVoice = window.oktellVoice;
-        }
-      }
 
       function callConnectCallback(result) {
         callFunc(oktellOptions.callback, result);
