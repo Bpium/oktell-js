@@ -32,25 +32,25 @@ module.exports = (grunt)->
 
 
 
-	for i in [karmaStartPort..karmaStartPort+karmaServersCount-1]
-		taskName = 'server'+i
-		userDir = myConf.karmaChromeUsersDir+'/'+i
-		if not grunt.file.isDir(userDir)
-			grunt.file.mkdir userDir
+# 	for i in [karmaStartPort..karmaStartPort+karmaServersCount-1]
+# 		taskName = 'server'+i
+# 		userDir = myConf.karmaChromeUsersDir+'/'+i
+# 		if not grunt.file.isDir(userDir)
+# 			grunt.file.mkdir userDir
 
 
-		karmaConfig.options.customLaunchers[taskName] =
-			base: 'ChromeCanary',
-			flags: [
-#				'--use-fake-device-for-media-stream',
-				'--user-data-dir='+(userDir.replace(/\//g, '\\\\'))
-			]
+# 		karmaConfig.options.customLaunchers[taskName] =
+# 			base: 'ChromeCanary',
+# 			flags: [
+# #				'--use-fake-device-for-media-stream',
+# 				'--user-data-dir='+(userDir.replace(/\//g, '\\\\'))
+# 			]
 
-		karmaConfig[taskName] =
-			port: i
-			browsers: [taskName]
+# 		karmaConfig[taskName] =
+# 			port: i
+# 			browsers: [taskName]
 
-		concurrentConfig.test.tasks.push 'karma:' + taskName
+# 		concurrentConfig.test.tasks.push 'karma:' + taskName
 
 	grunt.initConfig
 		myConf: myConf
