@@ -4013,22 +4013,24 @@ Oktell = (function(){
             connectSip(webphoneAuthData);
           });
         } else {
-          var server = new Server( oktellInfo.currentUrl, oktellOptions.openTimeout,
-                oktellOptions.queryDelayMin, oktellOptions.queryDelayMax, function(url){
 
-            server.sendOktell('login', {
-              userlogin: oktellInfo.login,
-              Password: oktellOptions.Password,
-              password: oktellOptions.password,
-              sessionid: oktellInfo.sessionId || undefined,
-              expires: oktellOptions.expires || undefined,
-              showid: 1,
-              usewebrtc: true,
-              workplace: oktellOptions.workplace || undefined,
+          oktellVoice.createUserMedia(function(){
+            var server = new Server( oktellInfo.currentUrl, oktellOptions.openTimeout,
+                  oktellOptions.queryDelayMin, oktellOptions.queryDelayMax, function(url){
 
-            }, function(data){
-              if ( data.result && data.sipuser && data.sippass && data.sipport ) {
-                oktellVoice.createUserMedia(function(){
+              server.sendOktell('login', {
+                userlogin: oktellInfo.login,
+                Password: oktellOptions.Password,
+                password: oktellOptions.password,
+                sessionid: oktellInfo.sessionId || undefined,
+                expires: oktellOptions.expires || undefined,
+                showid: 1,
+                usewebrtc: true,
+                workplace: oktellOptions.workplace || undefined,
+
+              }, function(data){
+                if ( data.result && data.sipuser && data.sippass && data.sipport ) {
+
                   connectSip({
                     user: data.sipuser,
                     pass: data.sippass,
@@ -4036,18 +4038,21 @@ Oktell = (function(){
                     port: data.sipport,
                     secure: data.sipsecure
                   });
-                }, function(){
-                  callFunc(callback, false);
-                });
-              }
-              server.disconnect();
+
+                }
+                server.disconnect();
+              });
             });
+
+            server.on('errorConnection', function(data){
+              callFunc(callback, result);
+            });
+            server.multiConnect();
+
+          }, function(){
+            callFunc(callback, false);
           });
 
-          server.on('errorConnection', function(data){
-            callFunc(callback, result);
-          });
-          server.multiConnect();
         }
 
       },
