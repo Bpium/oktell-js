@@ -4182,7 +4182,7 @@ Oktell = (function(){
           }
           a.push('endCall');
         }
-      } else if ( ! obj || ( obj && obj.state !== undefined && obj.state != 0 ) ) {
+      } else {
         if ( hold ) {
           if ( phone.sipActive && phone.sip && typeof phone.sip.isOnHold === "function" && phone.sip.isOnHold() ) {
             a.push('resume');
