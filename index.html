@@ -21,10 +21,39 @@
 	<script type="text/javascript">
 		$(function(){
 
-			$('#j_login').val( localStorage.demoLogin || '' )
-			$('#j_pass').val( localStorage.demoPass || '' )
-			$('#j_server').val( localStorage.demoServer || '192.168.0.61' )
-			$('#j_webrtc').attr( 'checked',  Boolean(parseInt(localStorage.useWebRTC)) || false )
+      var storage = (function(){
+        try {
+          if ( localStorage && (typeof localStorage.getItem === 'function') ){
+            return localStorage;
+          } else {
+            throw "localStorage not support";
+          }
+        } catch (e) {
+          try {
+            if ( sessionStorage && (typeof sessionStorage.getItem === 'function') ){
+              return sessionStorage;
+            } else {
+              throw "localStorage not support";
+            }
+          } catch (e) {
+            var methods = ["getItem", "setItem", "clear", "removeItem"],
+              emptyFn = function(){};
+
+            function LocalStorage(){}
+
+            for ( var i in methods ) {
+              LocalStorage.prototype[methods[i]] = emptyFn;
+            }
+
+            return new LocalStorage;
+          }
+        }
+      })();
+
+			$('#j_login').val( storage.demoLogin || '' )
+			$('#j_pass').val( storage.demoPass || '' )
+			$('#j_server').val( storage.demoServer || 'oktellserver.lan' )
+			$('#j_webrtc').attr( 'checked',  Boolean(parseInt(storage.useWebRTC)) || false )
 
 			$('#j_login').focus();
 
@@ -81,10 +110,10 @@
 
 				//startWebRtcClient(login,pass,server);
 
-				localStorage.demoLogin = login
-				localStorage.demoPass = pass
-				localStorage.demoServer = server
-				localStorage.useWebRTC = useWebRTC ? 1 : 0;
+				storage.demoLogin = login
+				storage.demoPass = pass
+				storage.demoServer = server
+				storage.useWebRTC = useWebRTC ? 1 : 0;
 
 				var connect = function() {
 					oktell.connect({
