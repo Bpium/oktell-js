@@ -4838,13 +4838,26 @@ Oktell = (function(){
       return sipPnoneActive;
     }
 
-    self.changePassword = function(newPass, oldPass, callback){
+    self.changePassword = function(newPass, oldPass, callback, checkForStrong){
       if ( ! (typeof newPass == 'string' && newPass) ) {
         callFunc(callback, getErrorObj(2802));
       } else {
-        newPass = md5(utf8DecodePass(newPass));
+        var newPassDecoeded = utf8DecodePass(newPass),
+            procedureParams;
+
+        newPass = md5(newPassDecoeded);
         oldPass = md5(utf8DecodePass(oldPass));
-        self.exec('changepassword', { newpwdmd5: newPass, oldpwdmd5: oldPass }, function(data){
+
+        procedureParams = {
+          newpwdmd5: newPass,
+          oldpwdmd5: oldPass
+        };
+
+        if ( checkForStrong ) {
+          procedureParams.newpwd = newPassDecoeded
+        }
+
+        self.exec('changepassword', procedureParams, function(data){
           if ( data.result ) {
             callFunc(callback, getSuccessObj({result: true}));
           } else if ( data.errormsg == 'old password is wrong' ) {
@@ -4854,7 +4867,7 @@ Oktell = (function(){
           }
         });
       }
-    }
+    };
 
     self.config = function(config) {
       if ( ! config ) { return false; }
