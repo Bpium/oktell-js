@@ -31,7 +31,7 @@
 
 			var stateEl = $('#connectionState');
 			stateEl.text('Соединение');
-			var oktell = window.oktell
+			var oktell = window.oktell;
 
 			oktell.on('disconnect', function(reason){
 				stateEl.text('Ошибка')
@@ -39,7 +39,7 @@
 
 			var log = function(){
 				console.warn.apply(console, arguments);
-			}
+			};
 
 			oktell.on('abonentsChange', function(i){
 				var abs = [];
@@ -51,7 +51,7 @@
 			oktell.on('holdAbonentEnter', function(i){ log('==== holdAbonentEnter ' + i.phone ); });
 			oktell.on('holdAbonentLeave', function(i){ log('==== holdAbonentLeave ' + i.phone ); });
 			oktell.on('holdStateChange', function(i){ log('**** holdStateChange hasHold ' + i.hasHold + ', abonent ' + (i.abonent && i.abonent.phone) ); });
-			oktell.on('stateChange', function(n,o){ log('++++ stateChange to ' + n + ' from ' + o); });
+			//oktell.on('stateChange', function(n,o){ log('++++ stateChange to ' + n + ' from ' + o); });
 			oktell.on('readyStart', function(d){ log('---- readyStart ' + (d && d[0] && d[0].phone)); });
 			oktell.on('readyStop', function(d){	log('---- readyStop ' + (d && d[0] && d[0].phone)); });
 			oktell.on('callStart', function(d){	log('---- callStart ' + (d && d[0] && d[0].phone)); });
@@ -63,7 +63,7 @@
 			oktell.on('talkStart', function(d){	log('---- talkStart ' + (d && d[0] && d[0].phone)); });
 			oktell.on('talkStop', function(d){	log('---- talkStop ' + (d && d[0] && d[0].phone)); });
 
-			var statesLogel = $('#webstate')
+			var statesLogel = $('#webstate');
 			oktell.on('statusChange', function(newS, oldS){
 				var d = new Date();
 				statesLogel.append( '<p>Cтатус = "' + newS + '", предыдущий статус = "' + oldS + '", время смены ' + d.getHours()+':'+ d.getMinutes()+':'+ d.getSeconds() + '</p>' );
@@ -74,16 +74,16 @@
 				e.preventDefault();
 
 
-				var login = $('#j_login').val()
-				var pass = $('#j_pass').val()
-				var server = $('#j_server').val()
-				var useWebRTC = $('#j_webrtc').is(':checked')
+				var login = $('#j_login').val();
+				var pass = $('#j_pass').val();
+				var server = $('#j_server').val();
+				var useWebRTC = $('#j_webrtc').is(':checked');
 
 				//startWebRtcClient(login,pass,server);
 
-				localStorage.demoLogin = login
-				localStorage.demoPass = pass
-				localStorage.demoServer = server
+				localStorage.demoLogin = login;
+				localStorage.demoPass = pass;
+				localStorage.demoServer = server;
 				localStorage.useWebRTC = useWebRTC ? 1 : 0;
 
 				var connect = function() {
@@ -113,7 +113,7 @@
 							}
 						}
 					});
-				}
+				};
 
 				if ( useWebRTC ) {
 					oktellVoice.createUserMedia(function(){
@@ -138,7 +138,40 @@
 				container: $('.panel_container'),
 				hideOnDisconnect: false
 			});
-			$('.userPhone').oktellButton()
+			$('.userPhone').oktellButton();
+
+
+      // user statuses
+      var statusesHistoryEl = $('#s-user-statuses'),
+          statusToChangeEl = $('#s-user-status-to-change'),
+          breakReasonIdEl = $('#s-break-reasons'),
+          breakReasonMsgEl = $('#s-break-reason'),
+          changeStatusForm = $('#s-change-user-status-form');
+      function logUserStatus(){
+        var time = new Date(),
+            message = [time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds()].join(':');
+            message += '\t' + Array.prototype.join.call(arguments, ' ');
+        statusesHistoryEl.val( statusesHistoryEl.val() + message + '\r\n' );
+        statusesHistoryEl.scrollTop(999999)
+      }
+      oktell.on('connect', function(){
+        var reasons = oktell.getBreakReasons();
+        $.each(reasons, function(index, obj){
+          breakReasonIdEl.append($("<option value="+ obj.id +">" + obj.name + "</option>"));
+        });
+
+        logUserStatus( "on connect\t|\t", oktell.getUserStatus(), oktell.getCurrentBreakReason() );
+      });
+      oktell.on('userStatusChange', function(newSt, oldSt){
+        logUserStatus("from event\t|\t", oldSt, '->', newSt, oktell.getCurrentBreakReason());
+        statusToChangeEl.val(newSt);
+        if ( oktell.getCurrentBreakReason() ) breakReasonIdEl.val(oktell.getCurrentBreakReason())
+      });
+      changeStatusForm.on('submit', function(){
+        oktell.setUserStatus(statusToChangeEl.val(), breakReasonIdEl.val() || breakReasonMsgEl.val(), function(data){
+          logUserStatus("from callback\t|\t", data.userStatus || data.errorMessage, oktell.getCurrentBreakReason())
+        });
+      });
 		});
 	</script>
 
@@ -147,6 +180,9 @@
 <div class="panel_container" style="width: 300px; float: left; margin-left: 50px;"></div>
 <div style="">
 	<style type="text/css">
+    body{
+      padding-bottom: 40px;
+    }
 		.userPhone {
 			float: right;
 			display: inline-block;
@@ -185,7 +221,7 @@
 
 
 	</div>
-	<div style="">
+	<div>
 		<br>
 		<span>Статус:</span> <span id="connectionState">Соединение</span><br>
 		<div style="display: none;">
@@ -331,6 +367,41 @@
 
 		</div>
 	</div>
+  <div>
+    <h2>История user-статусов</h2>
+    <div>
+      <textarea id="s-user-statuses" rows="10" cols="100"></textarea>
+    </div>
+    <div>
+      <form action="javascript:void(0)" id="s-change-user-status-form">
+        <label>
+          Сменить статус на
+          <select id="s-user-status-to-change">
+            <optgroup label="not call-center">
+              <option value="ready">ready</option>
+              <option value="redirect">redirect</option>
+              <option value="dnd">dnd</option>
+            </optgroup>
+            <optgroup label="call-center">
+              <option value="readyCC">readyCC</option>
+              <option value="readyCCManual">readyCCManual</option>
+              <option value="break">break</option>
+            </optgroup>
+            <optgroup label="both">
+              <option value="busy">busy</option>
+            </optgroup>
+          </select>
+          , breakReason:
+          <select id="s-break-reasons">
+            <option value=""></option>
+          </select>
+          или
+          <input id="s-break-reason" type="text"/>
+        </label>
+        <button type="submit">Change status</button>
+      </form>
+    </div>
+  </div>
 </div>
 
 </body>

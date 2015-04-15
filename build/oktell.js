@@ -1304,7 +1304,48 @@ Oktell = (function(){
       users = {},
       numbers = {},
       numbersById = {},
-      connectionClosedByUser = false;
+      connectionClosedByUser = false,
+
+      apiEvents = {
+        disconnect: 'disconnect',
+        statusChange: 'statusChange',
+        holdAbonentLeave: 'holdAbonentLeave',
+        holdAbonentEnter: 'holdAbonentEnter',
+        conferenceAbonentEnter: 'conferenceAbonentEnter',
+        conferenceAbonentLeave: 'conferenceAbonentLeave',
+        stateChange: 'stateChange',
+        holdStateChange: 'holdStateChange',
+        abonentsChange: 'abonentsChange',
+        connect: 'connect',
+        talkTimer: 'talkTimer',
+        queueAbonentEnter: 'queueAbonentEnter',
+        queueAbonentLeave: 'queueAbonentLeave',
+        queueChange: 'queueChange',
+        connecting: 'connecting',
+        connectError: 'connectError',
+
+        // phone events
+        readyStart: 'readyStart',
+        readyStop: 'readyStop',
+        ringStart: 'ringStart',
+        ringStop: 'ringStop',
+        backRingStart: 'backRingStart',
+        backRingStop: 'backRingStop',
+        callStart: 'callStart',
+        callStop: 'callStop',
+        talkStart: 'talkStart',
+        talkStop: 'talkStop',
+
+        // no documentation events
+        webrtcRingStart: 'webrtcRingStart',
+        webphoneCallStart: 'webphoneCallStart',
+        abonentListChange: 'abonentListChange',
+        webphoneConnect: 'webphoneConnect',
+        webphoneDisconnect: 'webphoneDisconnect',
+        callCenterStateChange: 'callCenterStateChange',
+
+        userStatusChange: 'userStatusChange'
+      };
 
     var exportApi = function(name, fn, context) {
       if ( ! self[name] && typeof fn == 'function' ) {
@@ -1312,7 +1353,7 @@ Oktell = (function(){
           return fn.apply( context || self, arguments );
         }
       }
-    }
+    };
 
     var oktellConnected = function(connected) {
       if ( connected !== undefined ) {
@@ -1323,7 +1364,7 @@ Oktell = (function(){
         }
       }
       return _oktellConnected;
-    }
+    };
 
     /**
      * Events
@@ -1340,7 +1381,7 @@ Oktell = (function(){
         return true;
       }
       return false;
-    }
+    };
 
     /**
      * Return name of state if state found, or false
@@ -1357,6 +1398,7 @@ Oktell = (function(){
       each( states, function(scode, message){
         if ( scode == code ) {
           msg = message.toLowerCase();
+          return breaker;
         }
       });
       return msg;
@@ -1377,7 +1419,7 @@ Oktell = (function(){
         if( typeof s != 'string' ) { result = false; return breaker; }
       });
       if ( ! result ){ return false; } else { return strings }
-    }
+    };
 
     /**
      * Check oktell websocket method's version
@@ -1513,8 +1555,11 @@ Oktell = (function(){
       2902: 'phone probably does not support intercom calls',
       // uploadFile
       3001: 'error while getting temp pass',
-      3002: 'aborted in beforeRequest callback function'
-
+      3002: 'aborted in beforeRequest callback function',
+      // userStatuses
+      4001: 'incorrect user status',
+      4002: 'not settable user status',
+      4003: 'number for redirect not defined'
     };
 
     /**
@@ -1590,7 +1635,7 @@ Oktell = (function(){
         }
         server.bindOktellEvent( eventNames, callback );
       }
-    }
+    };
 
     var unbindOktellEvent = function(eventNames, callback) {
       if ( ! eventNames ) {
@@ -1613,7 +1658,7 @@ Oktell = (function(){
       if ( server ) {
         server.unbindOktellEvent(eventNames, callback);
       }
-    }
+    };
 
     /**
      * Wrapper for server.sendOktell with userlogin setting
@@ -2176,7 +2221,7 @@ Oktell = (function(){
     })();
     extend(DynamicMethods.prototype, Events);
     // TODO bindOktell or self.server.bindOktellEvent ?
-    var dynamicMethods = new DynamicMethods()
+    var dynamicMethods = new DynamicMethods();
 
 
 
@@ -2201,12 +2246,34 @@ Oktell = (function(){
         REDIRECT: 3, //'Redirect', not in callcenter
         BREAK: 4 // break, only in callcenter
       },
+      userStatuses: {
+        // settable
+        // not call-center
+        READY: 'ready',
+        REDIRECT: 'redirect',
+        DND: 'dnd',
+        // call-center
+        READY_CC: 'readyCC',
+        READY_CC_MANUAL: 'readyCCManual',
+        BREAK: 'break',
+        // both
+        BUSY: 'busy',
+
+        // gettable only
+        BREAK_TALK: 'breakTalk',
+        BUSY_BREAK: 'busyBreak',
+        NOPHONE: 'noPhone'
+      },
       onCallCenter: 0,
+      onCallCenterManual: false,
       _onRedirect: false,
       _status: 0,
       _webStateId: 0,
+      _userStatusId: 'disconnected',
       onBreak: 0,
+      onTask: false,
       breakReasons: {},
+      lastBreakReason: null,
 
       loadBreakReasons: function(callback) {
         var that = this;
@@ -2331,7 +2398,7 @@ Oktell = (function(){
           var oldStatus = this.getWebStateStr(this._webStateId);
           this._webStateId = newStateId;
           if ( ! silent ) {
-            self.trigger('statusChange', this.getWebStateStr(this._webStateId), oldStatus );
+            self.trigger(apiEvents.statusChange, this.getWebStateStr(this._webStateId), oldStatus );
           }
         }
         return this._webStateId;
@@ -2371,7 +2438,7 @@ Oktell = (function(){
           newState = newState ? true : false;
           if ( this.onCallCenter !== newState ) {
             this.onCallCenter = newState;
-            self.trigger('callCenterStateChange', this.onCallCenter );
+            self.trigger(apiEvents.callCenterStateChange, this.onCallCenter );
           }
         }
         return this.onCallCenter;
@@ -2384,11 +2451,21 @@ Oktell = (function(){
       saveStatesFromServer: function(data) {
         this.callCenterState( data.oncallcenter );
         this.onBreak = data.onlunch;
+        this.onCallCenterManual = data.onccmanual;
         this.onRedirect(data.onredirect);
+
+        var userStateId = data.userstateid;
+        if ( userStateId === this.states.BREAK || userStateId === this.states.BUSY ) {
+          this.lastBreakReason = data.lunchreasonmsg || data.lunchreasonid;
+        }
+
+        // до версии 150414 параметра ontask не было, но ситуация,
+        // что в состоянии busy оператор работает по задаче покрывает 99% всех случаев
+        this.onTask = oktellInfo.oktellDated >= 150414 ? data.ontask || false : userStateId === this.states.BUSY;
 
         var currentWebState = this.webState();
         var currentState = this.state();
-        this.state( data.userstateid );
+        this.state( userStateId );
         if ( currentWebState == this.webStates.DND && this.setAfterBusy == this.webStates.DND && currentState == 5 && data.userstateid == 1 ) {
           this.setAfterBusy = false;
           this.changeStates(this.webStates.DND, true);
@@ -2396,6 +2473,7 @@ Oktell = (function(){
         }
 
         this.setWebStateFromUserState();
+        this.setUserStatusFromUserState();
       },
 
       setUserStateBusy: function() {
@@ -2529,13 +2607,242 @@ Oktell = (function(){
         } else {
           this.webState( this.webStates.REDIRECT );
         }
-      }
+      },
 
+      /**
+       * Set user status from state
+       * @returns {string} new user status
+       */
+      setUserStatusFromUserState: function(){
+        var lastUserState = this._userStatusId,
+            breakReasonIsChanged = false;
+
+        if ( this.onRedirect() ) {
+          this._userStatusId = this.userStatuses.REDIRECT;
+        } else {
+          switch ( this.state() ){
+            case this.states.READY:
+              if ( this.onCallCenter ){
+                if ( this.onCallCenterManual ){
+                  this._userStatusId = this.userStatuses.READY_CC_MANUAL;
+                } else {
+                  this._userStatusId = this.userStatuses.READY_CC;
+                }
+              } else {
+                this._userStatusId = this.userStatuses.READY;
+              }
+              break;
+            case this.states.BREAK:
+              this._userStatusId = this.userStatuses.BREAK;
+              break;
+            case this.states.OFF:
+              this._userStatusId = this.userStatuses.DND;
+              break;
+            case this.states.BUSY:
+            case this.states.RESERVED:
+              if ( this.onBreak ){
+                if ( this.onTask ) {
+                  this._userStatusId = this.userStatuses.BUSY_BREAK;
+                } else {
+                  this._userStatusId = this.userStatuses.BREAK_TALK;
+                }
+              } else {
+                this._userStatusId = this.userStatuses.BUSY;
+              }
+              break;
+            case this.states.NOPHONE:
+              this._userStatusId = this.userStatuses.NOPHONE;
+              break;
+          }
+
+          breakReasonIsChanged = (this._userStatusId === this.userStatuses.BREAK_TALK || this._userStatusId === this.userStatuses.BREAK)
+            && this._previousLastBreakReason !== this.lastBreakReason;
+        }
+
+        if ( lastUserState !== this._userStatusId || breakReasonIsChanged) {
+          self.trigger(apiEvents.userStatusChange, this._userStatusId, lastUserState);
+          this._previousLastBreakReason = this.lastBreakReason;
+        }
+
+        return this._userStatusId;
+      },
+
+      /**
+       * get current user status
+       * @returns {string}
+       */
+      getUserStatus: function(){
+        return this._userStatusId;
+      },
+
+      /**
+       * Set new user status
+       * @param {string} userStatus
+       * @param {number|string} breakReason
+       * @param {function} callback
+       */
+      setUserStatus: function(userStatus, breakReason, callback){
+        var currentStatus = this._userStatusId,
+            sObj = null,
+            that = this,
+            statusNotChanged = false,
+            enableRedirectAfterSave = false;
+
+        if ( userStatus === this.userStatuses.BREAK ){
+          if ( breakReason !== this.lastBreakReason ){
+            sObj = {
+              userstateid: this.states.BREAK,
+              oncallcenter: true,
+              onredirect: false
+            };
+
+            if ( breakReason ) {
+              if ( typeof breakReason === 'number' && this.breakReasons[breakReason] ) {
+                sObj.lunchreasonid = breakReason;
+              } else {
+                sObj.lunchreasonmsg = breakReason;
+              }
+            }
+          } else {
+            statusNotChanged = true;
+          }
+        } else {
+          if ( userStatus !== currentStatus ){
+            switch (userStatus) {
+              case this.userStatuses.READY:
+                sObj = {
+                  userstateid: this.states.READY,
+                  oncallcenter: false,
+                  onccmanual: false,
+                  onredirect: false
+                };
+                break;
+              case this.userStatuses.READY_CC:
+                sObj = {
+                  userstateid: this.states.READY,
+                  oncallcenter: true,
+                  onccmanual: false,
+                  onredirect: false
+                };
+                break;
+              case this.userStatuses.READY_CC_MANUAL:
+                sObj = {
+                  userstateid: this.states.READY,
+                  oncallcenter: true,
+                  onccmanual: true,
+                  onredirect: false
+                };
+                break;
+              case this.userStatuses.BUSY:
+                if ( this.state() !== this.states.BUSY ){
+                  sObj = {
+                    userstateid: this.states.BUSY,
+                    onredirect: false
+                  };
+                } else {
+                  statusNotChanged = true;
+                }
+                break;
+              case this.userStatuses.DND:
+                sObj = {
+                  userstateid: this.states.OFF,
+                  oncallcenter: false,
+                  onredirect: false
+                };
+                break;
+              case this.userStatuses.REDIRECT:
+                if ( this.getRedirectNumber() ) {
+                  // октелл не умеет сразу выводить из колл-центра в редирект,
+                  // поэтому приходится сначала выйти из колл-центра, а затем выставить редирект
+                  sObj = {
+                    oncallcenter: false,
+                    userstateid: this.states.OFF
+                  };
+
+                  enableRedirectAfterSave = true;
+                } else {
+                  // number for redirecct not defined
+                  callFunc(callback, getErrorObj(4003));
+                  return;
+                }
+                break;
+            }
+          } else {
+            statusNotChanged = true;
+          }
+        }
+
+        if ( sObj ){
+          // октелл не умеет сразу выводить из колл-центра в редирект,
+          // поэтому приходится сначала выйти из колл-центра, а затем выставить редирект
+
+          // то что выполяняется после обычного сохранения
+          var afterSaveFn = function(data){
+            if ( data && data.result ){
+              // breakreason not come in this callback
+              if ( breakReason && (data.userstateid === that.states.BREAK || data.userstateid === that.states.BUSY) && !(data.lunchreasonid || data.lunchreasonmsg) ){
+                if ( that.breakReasons[breakReason] ) {
+                  data.lunchreasonid = breakReason;
+                } else {
+                  data.lunchreasonmsg = breakReason;
+                }
+              }
+
+              that.saveStatesFromServer(data);
+              callFunc(callback, getSuccessObj({'userStatus': that._userStatusId}));
+            } else {
+              callFunc(callback, data);
+            }
+          };
+
+          // сохраняем на сервере
+          sendOktell('setuserstate', sObj, function(data){
+            if ( data && data.result && enableRedirectAfterSave ){
+              sendOktell('setuserstate', {onredirect: true}, function(data){
+                afterSaveFn(data);
+              });
+            } else {
+              afterSaveFn(data);
+            }
+          });
+        } else {
+          if ( statusNotChanged ) {
+            callFunc(callback, getSuccessObj({'userStatus': that._userStatusId}));
+          } else {
+            for ( var key in this.userStatuses ){
+              if ( this.userStatuses[key] === userStatus ){
+                // not settable user status
+                callFunc(callback, getErrorObj(4002));
+                return;
+              }
+            }
+
+            // incorrect user status
+            callFunc(callback, getErrorObj(4001));
+          }
+        }
+      },
+
+      /**
+       * Get current break reason
+       * @returns {number|string|null} Null - when user status not in ['break', 'breakTalk'].
+       * String - when break reason is custom.
+       * Number - break reason code when reason from getBreakReasons()-collection.
+       */
+      getCurrentBreakReason: function(){
+        if ( this._userStatusId === this.userStatuses.BREAK || this._userStatusId === this.userStatuses.BREAK_TALK ){
+          return this.lastBreakReason;
+        }
+        return null;
+      }
     });
     exportApi('setRedirectNumber', userStates.saveUserRedirect, userStates);
     exportApi('getStatus', userStates.getWebStateStr, userStates);
     exportApi('setStatus', userStates.changeStates, userStates);
     exportApi('setUserStateBusy', userStates.setUserStateBusy, userStates);
+    exportApi('getUserStatus', userStates.getUserStatus, userStates);
+    exportApi('setUserStatus', userStates.setUserStatus, userStates);
+    exportApi('getCurrentBreakReason', userStates.getCurrentBreakReason, userStates);
 
     /**
      * PHONE
@@ -2597,14 +2904,13 @@ Oktell = (function(){
           that.sipActive = false;
         });
         that.sip.on('ringStart', function( name, remoteIdentity){
-          self.trigger('webrtcRingStart', name, remoteIdentity);
+          self.trigger(apiEvents.webrtcRingStart, name, remoteIdentity);
         });
         that.sip.on('RTCSessionFailed', function(){
 
         });
         that.sip.on('RTCSessionStarted', function(){
           that.sipHasRTCSession = true;
-          self.trigger('')
 //          that.loadStates();
         });
         that.sip.on('RTCSessionEnded', function(){
@@ -2709,28 +3015,28 @@ Oktell = (function(){
           var holdAbonentChange = false;
           if ( oldHoldAbonent && ( oldHoldAbonent.key != this._holdAbonent.key ) || ( ! this._holdAbonent ) ) {
             holdAbonentChange = true;
-            self.trigger('holdAbonentLeave', cloneObject(oldHoldAbonent) );
+            self.trigger(apiEvents.holdAbonentLeave, cloneObject(oldHoldAbonent) );
           }
 
           if ( !(oldHoldAbonent && this._holdAbonent && this._holdAbonent.key && oldHoldAbonent.key && this._holdAbonent.key == oldHoldAbonent.key ) ) {
             holdAbonentChange = true;
-            self.trigger('holdAbonentEnter', cloneObject(this._holdAbonent));
+            self.trigger(apiEvents.holdAbonentEnter, cloneObject(this._holdAbonent));
           }
           var newHoldInfo = this.getHoldInfo();
           if ( oldHoldInfo.hasHold != newHoldInfo.hasHold || holdAbonentChange ) {
-            self.trigger('holdStateChange', cloneObject(newHoldInfo));
+            self.trigger(apiEvents.holdStateChange, cloneObject(newHoldInfo));
           }
           return true;
         } else if ( info === false ) {
           if ( this._holdAbonent ) {
-            self.trigger('holdAbonentLeave', cloneObject(this._holdAbonent));
+            self.trigger(apiEvents.holdAbonentLeave, cloneObject(this._holdAbonent));
           }
           this._holdAbonent = undefined;
           var oldHold = this._holdNumber;
           this._holdNumber = false;
 
           if ( oldHold !== this._holdNumber ) {
-            self.trigger('holdStateChange', cloneObject(this.getHoldInfo()));
+            self.trigger(apiEvents.holdStateChange, cloneObject(this.getHoldInfo()));
           }
         }
         return false;
@@ -2849,7 +3155,7 @@ Oktell = (function(){
             }
           }
 
-          self.trigger('stateChange', newState, oldState );
+          self.trigger(apiEvents.stateChange, newState, oldState );
 
           var abonents = this.getAbonents(true);
           if ( abonents.length == 0 ) {
@@ -2859,22 +3165,22 @@ Oktell = (function(){
 //          var abonentsForTalkStop = newStateId == this.states.TALK && oldStateId == this.states.TALK ? oldAbonents : abonents;
 
           switch ( oldStateId ) {
-            case this.states.READY: self.trigger('readyStop', oldAbonents); break;
-            case this.states.RING: self.trigger('ringStop', oldAbonents); break;
-            case this.states.BACKRING: self.trigger('backRingStop', oldAbonents); break;
-            case this.states.CALL: self.trigger('callStop', oldAbonents); break;
-            case this.states.BACKCALL: self.trigger('callStop', oldAbonents); break;
-            case this.states.TALK: self.trigger('talkStop', oldAbonents); break;
+            case this.states.READY: self.trigger(apiEvents.readyStop, oldAbonents); break;
+            case this.states.RING: self.trigger(apiEvents.ringStop, oldAbonents); break;
+            case this.states.BACKRING: self.trigger(apiEvents.backRingStop, oldAbonents); break;
+            case this.states.CALL: self.trigger(apiEvents.callStop, oldAbonents); break;
+            case this.states.BACKCALL: self.trigger(apiEvents.callStop, oldAbonents); break;
+            case this.states.TALK: self.trigger(apiEvents.talkStop, oldAbonents); break;
           }
 
           switch ( this._stateId ) {
-            case this.states.READY: self.trigger('readyStart', abonents); break;
-            case this.states.RING: self.trigger('ringStart', abonents); break;
-            case this.states.BACKRING: self.trigger('backRingStart', abonents); break;
-            case this.states.CALL: self.trigger('callStart',abonents); break;
-            case this.states.BACKCALL: self.trigger('callStart', abonents); break;
-            case this.states.TALK: self.trigger('talkStart', abonents); break;
-            //case this.states.CALLWEBPHONE: self.trigger('webphoneCallStart', abonents); break;
+            case this.states.READY: self.trigger(apiEvents.readyStart, abonents); break;
+            case this.states.RING: self.trigger(apiEvents.ringStart, abonents); break;
+            case this.states.BACKRING: self.trigger(apiEvents.backRingStart, abonents); break;
+            case this.states.CALL: self.trigger(apiEvents.callStart,abonents); break;
+            case this.states.BACKCALL: self.trigger(apiEvents.callStart, abonents); break;
+            case this.states.TALK: self.trigger(apiEvents.talkStart, abonents); break;
+            //case this.states.CALLWEBPHONE: self.trigger(apiEvents.webphoneCallStart, abonents); break;
           }
 
 
@@ -3124,14 +3430,14 @@ Oktell = (function(){
         if ( a ) {
           this.abonentList[a.key] = a;
           if ( a.key != oldKey ) {
-            self.trigger('abonentListChange', this.getAbonents() );
-            self.trigger('abonentsChange', this.getAbonents(true) );
+            self.trigger(apiEvents.abonentListChange, this.getAbonents() );
+            self.trigger(apiEvents.abonentsChange, this.getAbonents(true) );
           }
         } else if ( oldAbonent && saveOldAbonentIfEmpty ) {
           this.abonentList[oldKey] = oldAbonent;
         } else if ( oldKey ) {
-          self.trigger('abonentListChange', this.getAbonents() );
-          self.trigger('abonentsChange', this.getAbonents(true) );
+          self.trigger(apiEvents.abonentListChange, this.getAbonents() );
+          self.trigger(apiEvents.abonentsChange, this.getAbonents(true) );
         }
         return this.abonentList;
       },
@@ -3155,7 +3461,7 @@ Oktell = (function(){
                 var a = that.createAbonent(ab);
                 that.abonentList[a.key] = a;
                 if ( that.conferenceId() && that.state() == that.states.TALK ) {
-                  self.trigger('conferenceAbonentEnter', that.abonentList[a.key] );
+                  self.trigger(apiEvents.conferenceAbonentEnter, that.abonentList[a.key] );
                 }
               }
             }
@@ -3167,8 +3473,8 @@ Oktell = (function(){
             that.removeAbonents(id);
           }
         });
-        self.trigger('abonentListChange', that.getAbonents() );
-        self.trigger('abonentsChange', that.getAbonents(true) );
+        self.trigger(apiEvents.abonentListChange, that.getAbonents() );
+        self.trigger(apiEvents.abonentsChange, that.getAbonents(true) );
         return true;
       },
 
@@ -3190,9 +3496,9 @@ Oktell = (function(){
           if ( !this.abonentList[abonent.key] ) {
             this.abonentList[abonent.key] = abonent;
             if ( this.conferenceId() && this.state() == this.states.TALK ) {
-              self.trigger('conferenceAbonentEnter', this.abonentList[a.key] );
-              self.trigger('abonentListChange', this.getAbonents() );
-              self.trigger('abonentsChange', this.getAbonents(true) );
+              self.trigger(apiEvents.conferenceAbonentEnter, this.abonentList[a.key] );
+              self.trigger(apiEvents.abonentListChange, this.getAbonents() );
+              self.trigger(apiEvents.abonentsChange, this.getAbonents(true) );
             }
           }
         } else if ( this.abonentList[abonent.key] ) {
@@ -3252,7 +3558,7 @@ Oktell = (function(){
         var that = this;
         each( that.abonentList, function(ab,i){
           if ( that.conferenceId() && that.state() == that.states.TALK && ab.isConferenceCompetitor ) {
-            self.trigger('conferenceAbonentLeave', ab);
+            self.trigger(apiEvents.conferenceAbonentLeave, ab);
           }
           delete that.abonentList[i];
         });
@@ -3267,15 +3573,15 @@ Oktell = (function(){
         var that = this;
         if ( number && that.abonentList[number] ) {
           if ( that.conferenceId() && that.state() == that.states.TALK && that.abonentList[number].isConferenceCompetitor ) {
-            self.trigger('conferenceAbonentLeave', that.abonentList[number]);
+            self.trigger(apiEvents.conferenceAbonentLeave, that.abonentList[number]);
           }
           delete that.abonentList[number];
-          self.trigger('abonentListChange', that.getAbonents() );
-          self.trigger('abonentsChange', that.getAbonents(true) );
+          self.trigger(apiEvents.abonentListChange, that.getAbonents() );
+          self.trigger(apiEvents.abonentsChange, that.getAbonents(true) );
         } else if ( number === undefined && size(that.abonentList) ) {
           each( that.abonentList, function(ab,i){
             if ( that.conferenceId() && that.state() == that.states.TALK && ab.isConferenceCompetitor ) {
-              self.trigger('conferenceAbonentLeave', ab);
+              self.trigger(apiEvents.conferenceAbonentLeave, ab);
             }
             delete that.abonentList[i];
           });
@@ -3283,8 +3589,8 @@ Oktell = (function(){
         } else {
           return false;
         }
-        self.trigger('abonentListChange', that.getAbonents() );
-        self.trigger('abonentsChange', that.getAbonents(true) );
+        self.trigger(apiEvents.abonentListChange, that.getAbonents() );
+        self.trigger(apiEvents.abonentsChange, that.getAbonents(true) );
         return true;
       },
 
@@ -3864,20 +4170,20 @@ Oktell = (function(){
                 absArr.push(ab);
                 if ( ! that.queueList[ab.key] && ! that.isAbonent(ab.key) ) {
                   that.queueList[ab.key] = ab;
-                  self.trigger('queueAbonentEnter', ab)
+                  self.trigger(apiEvents.queueAbonentEnter, ab)
                   listChanged = true;
                 }
               });
             }
             each( that.queueList, function(ab, key){
               if ( ! abonents[key] ) {
-                self.trigger('queueAbonentLeave', ab)
+                self.trigger(apiEvents.queueAbonentLeave, ab)
                 delete that.queueList[key];
                 listChanged = true;
               }
             });
             if ( listChanged ) {
-              self.trigger('queueChange', absArr);
+              self.trigger(apiEvents.queueChange, absArr);
             }
             callFunc(callback, getSuccessObj({queue: absArr}));
           } else {
@@ -3902,9 +4208,9 @@ Oktell = (function(){
         var that = this;
         if ( that._talkLength !== false ) {
           var len = that.getCurrentTalkLength()
-          self.trigger('talkTimer', len, that.formatTime(len) );
+          self.trigger(apiEvents.talkTimer, len, that.formatTime(len) );
         } else {
-          self.trigger('talkTimer', false );
+          self.trigger(apiEvents.talkTimer, false );
         }
       },
 
@@ -3996,14 +4302,14 @@ Oktell = (function(){
           if ( sipPhone ) {
             sipPhone.on('connect', function(){
               sipPnoneActive = true;
-              self.trigger('webphoneConnect');
+              self.trigger(apiEvents.webphoneConnect);
             });
             sipPhone.on('all', function(event){
               log('Oktell webphone event: ' + event, arguments);
             });
             sipPhone.on('disconnect', function(){
               sipPnoneActive = false;
-              self.trigger('webphoneDisconnect');
+              self.trigger(apiEvents.webphoneDisconnect);
             });
             phone.setSipPhone(sipPhone);
             result = true;
@@ -4032,8 +4338,7 @@ Oktell = (function(){
                 expires: oktellOptions.expires || undefined,
                 showid: 1,
                 usewebrtc: true,
-                workplace: oktellOptions.workplace || undefined,
-
+                workplace: oktellOptions.workplace || undefined
               }, function(data){
                 if ( data.result && data.sipuser && data.sippass && data.sipport ) {
 
@@ -4095,7 +4400,7 @@ Oktell = (function(){
      * @type {Object}
      */
     var pa = {};
-    pa['-'] = {}
+    pa['-'] = {};
     pa[phone.states.DISCONNECTED] = {};
     pa[phone.states.BACKCALL] = { endCall: 1 };
     pa[phone.states.BACKRING] = { endCall: 1, answer: 1 };
@@ -4110,7 +4415,7 @@ Oktell = (function(){
      * @type {Object}
      */
     var pau = {};
-    pau['-'] = {}
+    pau['-'] = {};
     pau[userStates.states.DISCONNECTED] = {};
     pau[userStates.states.READY] = {endCall: 1, conference: 1, call: 1, intercom: 1, toggle: 1, transfer: 1, resume: 1, ghostListen: 1, ghostHelp: 1, ghostConference: 1, resume:1};
     pau[userStates.states.BREAK] = {endCall: 1, call: 1, intercom: 1, toggle: 1, transfer: 1, ghostListen: 1, resume: 1, ghostHelp: 1, ghostConference: 1};
@@ -4141,7 +4446,7 @@ Oktell = (function(){
       this.getActions = function(){
         return a;
       }
-    }
+    };
 
     /**
      * Return possible actions by phone number or userid
@@ -4256,7 +4561,7 @@ Oktell = (function(){
           phone.queue()
         }
       }, timeout);
-    }
+    };
 
     /**
      * connect with server
@@ -4266,7 +4571,7 @@ Oktell = (function(){
      */
     var connect = function( options, callback ) {
 
-      self.trigger('connecting');
+      self.trigger(apiEvents.connecting);
 
       if ( serverConnected() ) {
         return true;
@@ -4328,7 +4633,7 @@ Oktell = (function(){
         oktellOptions.url = links;
       } else {
         callConnectCallback( getErrorObj(1205) );
-        self.trigger('connectError', getErrorObj(1205) );
+        self.trigger(apiEvents.connectError, getErrorObj(1205) );
         return false;
       }
 
@@ -4342,7 +4647,7 @@ Oktell = (function(){
 
       if ( ! sessionId && ( oktellOptions.password === undefined || oktellOptions.password === null ) ) {
         callConnectCallback( getErrorObj(1213) );
-        self.trigger('connectError', getErrorObj(1213) );
+        self.trigger(apiEvents.connectError, getErrorObj(1213) );
         return false;
       }
 
@@ -4384,7 +4689,7 @@ Oktell = (function(){
                 errorCode = 1212;
               }
               callConnectCallback( getLoginErrorObj(errorCode) );
-              self.trigger('connectError', getLoginErrorObj(errorCode) );
+              self.trigger(apiEvents.connectError, getLoginErrorObj(errorCode) );
               disconnect(14, false, false);
             } else if (data.result == 1) {
               clearInterval(pingTimer);
@@ -4490,10 +4795,10 @@ Oktell = (function(){
                                         }
                                       }
 
-                                      self.trigger('connect');
+                                      self.trigger(apiEvents.connect);
                                     } else {
                                       callConnectCallback( getLoginErrorObj(1207) );
-                                      self.trigger('connectError', getLoginErrorObj(1207) );
+                                      self.trigger(apiEvents.connectError, getLoginErrorObj(1207) );
                                       disconnect(14);
                                     }
                                   });
@@ -4502,20 +4807,20 @@ Oktell = (function(){
                             });
                           } else {
                             callConnectCallback( getLoginErrorObj(1209) );
-                            self.trigger('connectError', getLoginErrorObj(1209) );
+                            self.trigger(apiEvents.connectError, getLoginErrorObj(1209) );
                             disconnect(14);
                           }
                         });
                       });
                     } else {
                       callConnectCallback( getLoginErrorObj(1210) );
-                      self.trigger('connectError', getLoginErrorObj(1210) );
+                      self.trigger(apiEvents.connectError, getLoginErrorObj(1210) );
                       disconnect(14);
                     }
                   });
                 } else {
                   callConnectCallback( getLoginErrorObj(1206 ) );
-                  self.trigger('connectError', getLoginErrorObj(1206) );
+                  self.trigger(apiEvents.connectError, getLoginErrorObj(1206) );
                   disconnect(11);
                 }
               });
@@ -4523,13 +4828,13 @@ Oktell = (function(){
 
             } else {
               callConnectCallback( getLoginErrorObj(1211) );
-              self.trigger('connectError', getLoginErrorObj(1211) );
+              self.trigger(apiEvents.connectError, getLoginErrorObj(1211) );
               disconnect(14);
             }
           });
         });
         server.on('errorConnection', function(data){
-          self.trigger('connectError', getErrorObj(1200) );
+          self.trigger(apiEvents.connectError, getErrorObj(1200) );
           callConnectCallback( getErrorObj(1200) );
         });
         server.on('connectionClose', function(){
@@ -4569,11 +4874,11 @@ Oktell = (function(){
           reason = getDisconnectReasonObj(reason);
         }
         if ( ! silent ) {
-          self.trigger('disconnect', reason);
+          self.trigger(apiEvents.disconnect, reason);
         }
       } else {
         if ( clearSession === 'auto' || clearSession ){
-          removeUserSession()
+          removeUserSession();
           sendOktell('logout');
         } else {
           server.disconnect();
@@ -4763,7 +5068,7 @@ Oktell = (function(){
      */
     self.getMyInfo = function() {
       return cloneObject(oktellInfo);
-    }
+    };
 
     /**
      * API Call in intercom mode
@@ -4821,28 +5126,28 @@ Oktell = (function(){
         nums[u.number] = u;
       });
       return nums;
-    }
+    };
 
     /**
      * API get lunch reasons
      */
     self.getLunchReasons = self.getBreakReasons = function() {
       return cloneObject(userStates.breakReasons) || {}
-    }
+    };
 
     self.getLog = function() {
       return logStr;
-    }
+    };
 
     exportApi('formatPhone', formatPhone, undefined);
 
     self.inCallCenter = function() {
       return userStates.callCenterState();
-    }
+    };
 
     self.webphoneIsActive = function() {
       return sipPnoneActive;
-    }
+    };
 
     self.changePassword = function(newPass, oldPass, callback, checkForStrong){
       if ( ! (typeof newPass == 'string' && newPass) ) {
@@ -4893,7 +5198,7 @@ Oktell = (function(){
         oktellOptions.queryTimeout = parseInt(config.queryTimeout);
       }
 
-    }
+    };
 
     self.version = '1.7.2';
 
