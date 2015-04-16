@@ -2455,7 +2455,7 @@ Oktell = (function(){
 
         // до версии 150414 параметра ontask не было, но ситуация,
         // что в состоянии busy оператор работает по задаче покрывает 99% всех случаев
-        this.onTask = oktellInfo.oktellDated >= 150414 ? data.ontask || false : userStateId === this.states.BUSY;
+        this.onTask = oktellInfo.oktellDated >= 150416 ? data.ontask || false : userStateId === this.states.BUSY;
 
         var currentWebState = this.webState();
         var currentState = this.state();
