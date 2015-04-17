@@ -1338,7 +1338,7 @@ Oktell = (function(){
         webphoneDisconnect: 'webphoneDisconnect',
         callCenterStateChange: 'callCenterStateChange',
 
-        userStatusChange: 'userStatusChange'
+        userStateChange: 'userStateChange'
       };
 
     var exportApi = function(name, fn, context) {
@@ -2241,7 +2241,7 @@ Oktell = (function(){
         BREAK: 4 // break, only in callcenter
       },
       userStatuses: {
-        // settable
+        // statuses, settable
         // not call-center
         READY: 'ready',
         REDIRECT: 'redirect',
@@ -2250,10 +2250,9 @@ Oktell = (function(){
         READY_CC: 'readyCC',
         READY_CC_MANUAL: 'readyCCManual',
         BREAK: 'break',
-        // both
-        BUSY: 'busy',
 
-        // gettable only
+        // states, gettable in states
+        BUSY: 'busy', // settable-only status
         BREAK_TALK: 'breakTalk',
         BUSY_BREAK: 'busyBreak',
         NOPHONE: 'noPhone'
@@ -2263,6 +2262,7 @@ Oktell = (function(){
       _onRedirect: false,
       _status: 0,
       _webStateId: 0,
+      _userStateId: 'disconnected',
       _userStatusId: 'disconnected',
       onBreak: 0,
       onTask: false,
@@ -2317,7 +2317,7 @@ Oktell = (function(){
       },
 
       /**
-       * Change states through change stateid on server or enabling redirect on server. Also save local states
+       * Deprecated. Change states through change stateid on server or enabling redirect on server. Also save local states.
        * @param newWebState
        * @param silent - if true, then event statusChange API event
        * @param message - lunch reason message in callcenter
@@ -2467,7 +2467,7 @@ Oktell = (function(){
         }
 
         this.setWebStateFromUserState();
-        this.setUserStatusFromUserState();
+        this.setUserStateAndStatusFromState();
       },
 
       setUserStateBusy: function() {
@@ -2607,58 +2607,76 @@ Oktell = (function(){
        * Set user status from state
        * @returns {string} new user status
        */
-      setUserStatusFromUserState: function(){
-        var lastUserState = this._userStatusId,
+      setUserStateAndStatusFromState: function(){
+        var lastUserState = this._userStateId,
+            lastUserStatus = this._userStatusId,
             breakReasonIsChanged = false;
+
+        switch ( this.state() ){
+          case this.states.READY:
+            if ( this.onCallCenter ){
+              if ( this.onCallCenterManual ){
+                this._userStateId = this.userStatuses.READY_CC_MANUAL;
+                this._userStatusId = this.userStatuses.READY_CC_MANUAL;
+              } else {
+                this._userStateId = this.userStatuses.READY_CC;
+                this._userStatusId = this.userStatuses.READY_CC;
+              }
+            } else {
+              this._userStateId = this.userStatuses.READY;
+              this._userStatusId = this.userStatuses.READY;
+            }
+            break;
+          case this.states.BREAK:
+            this._userStateId = this.userStatuses.BREAK;
+            this._userStatusId = this.userStatuses.BREAK;
+            break;
+          case this.states.OFF:
+            this._userStateId = this.userStatuses.DND;
+            this._userStatusId = this.userStatuses.DND;
+            break;
+          case this.states.BUSY:
+          case this.states.RESERVED:
+            if ( this.onCallCenter ){
+              if ( this.onCallCenterManual ){
+                this._userStatusId = this.userStatuses.READY_CC_MANUAL;
+              } else {
+                this._userStatusId = this.userStatuses.READY_CC;
+              }
+            } else {
+              this._userStatusId = this.userStatuses.READY;
+            }
+
+            if ( this.onBreak ){
+              if ( this.onTask ) {
+                this._userStateId = this.userStatuses.BUSY_BREAK;
+              } else {
+                this._userStateId = this.userStatuses.BREAK_TALK;
+                this._userStatusId = this.userStatuses.BREAK;
+              }
+            } else {
+              this._userStateId = this.userStatuses.BUSY;
+            }
+            break;
+          case this.states.NOPHONE:
+            this._userStateId = this.userStatuses.NOPHONE;
+            this._userStatusId = this.userStatuses.NOPHONE;
+            break;
+        }
 
         if ( this.onRedirect() ) {
           this._userStatusId = this.userStatuses.REDIRECT;
-        } else {
-          switch ( this.state() ){
-            case this.states.READY:
-              if ( this.onCallCenter ){
-                if ( this.onCallCenterManual ){
-                  this._userStatusId = this.userStatuses.READY_CC_MANUAL;
-                } else {
-                  this._userStatusId = this.userStatuses.READY_CC;
-                }
-              } else {
-                this._userStatusId = this.userStatuses.READY;
-              }
-              break;
-            case this.states.BREAK:
-              this._userStatusId = this.userStatuses.BREAK;
-              break;
-            case this.states.OFF:
-              this._userStatusId = this.userStatuses.DND;
-              break;
-            case this.states.BUSY:
-            case this.states.RESERVED:
-              if ( this.onBreak ){
-                if ( this.onTask ) {
-                  this._userStatusId = this.userStatuses.BUSY_BREAK;
-                } else {
-                  this._userStatusId = this.userStatuses.BREAK_TALK;
-                }
-              } else {
-                this._userStatusId = this.userStatuses.BUSY;
-              }
-              break;
-            case this.states.NOPHONE:
-              this._userStatusId = this.userStatuses.NOPHONE;
-              break;
-          }
-
-          breakReasonIsChanged = (this._userStatusId === this.userStatuses.BREAK_TALK || this._userStatusId === this.userStatuses.BREAK)
-            && this._previousLastBreakReason !== this.lastBreakReason;
         }
 
-        if ( lastUserState !== this._userStatusId || breakReasonIsChanged) {
-          self.trigger(apiEvents.userStatusChange, this._userStatusId, lastUserState);
+        breakReasonIsChanged = (this._userStateId === this.userStatuses.BREAK_TALK || this._userStateId === this.userStatuses.BREAK)
+          && this._previousLastBreakReason !== this.lastBreakReason;
+
+        if ( lastUserState !== this._userStateId || lastUserStatus !== this._userStatusId || breakReasonIsChanged) {
+          self.trigger(apiEvents.userStateChange, this._userStateId, this._userStatusId, this.lastBreakReason);
           this._previousLastBreakReason = this.lastBreakReason;
         }
 
-        return this._userStatusId;
+        return this._userStateId;
       },
 
       /**
@@ -2670,13 +2688,22 @@ Oktell = (function(){
       },
 
       /**
+       * get current user state
+       * @returns {string}
+       */
+      getUserState: function(){
+        return this._userStateId;
+      },
+
+      /**
        * Set new user status
        * @param {string} userStatus
        * @param {number|string} breakReason
        * @param {function} callback
        */
       setUserStatus: function(userStatus, breakReason, callback){
-        var currentStatus = this._userStatusId,
+        var currentState = this._userStateId,
+            currentStatus = this._userStatusId,
             sObj = null,
             that = this,
             statusNotChanged = false,
@@ -2745,15 +2772,19 @@ Oktell = (function(){
                 };
                 break;
               case this.userStatuses.REDIRECT:
-                if ( this.getRedirectNumber() ) {
-                  // октелл не умеет сразу выводить из колл-центра в редирект,
-                  // поэтому приходится сначала выйти из колл-центра, а затем выставить редирект
-                  sObj = {
-                    oncallcenter: false,
-                    userstateid: this.states.OFF
-                  };
+                if ( this.getRedirectNumber() ){
+                  if ( this.state() !== this.states.BUSY ){
+                    // октелл не умеет сразу выводить из колл-центра в редирект,
+                    // поэтому приходится сначала выйти из колл-центра, а затем выставить редирект
+                    sObj = {
+                      oncallcenter: false,
+                      userstateid: this.states.OFF
+                    };
 
-                  enableRedirectAfterSave = true;
+                    enableRedirectAfterSave = true;
+                  } else {
+                    statusNotChanged = true;
+                  }
                 } else {
                   // number for redirecct not defined
                   callFunc(callback, getErrorObj(4003));
@@ -2783,7 +2814,7 @@ Oktell = (function(){
               }
 
               that.saveStatesFromServer(data);
-              callFunc(callback, getSuccessObj({'userStatus': that._userStatusId}));
+              callFunc(callback, getSuccessObj({userState: that._userStateId, userStatus: that._userStatusId}));
             } else {
               callFunc(callback, data);
             }
@@ -2801,7 +2832,7 @@ Oktell = (function(){
           });
         } else {
           if ( statusNotChanged ) {
-            callFunc(callback, getSuccessObj({'userStatus': that._userStatusId}));
+            callFunc(callback, getSuccessObj({userState: that._userStateId, userStatus: that._userStatusId}));
           } else {
             for ( var key in this.userStatuses ){
               if ( this.userStatuses[key] === userStatus ){
@@ -2824,7 +2855,7 @@ Oktell = (function(){
        * Number - break reason code when reason from getBreakReasons()-collection.
        */
       getCurrentBreakReason: function(){
-        if ( this._userStatusId === this.userStatuses.BREAK || this._userStatusId === this.userStatuses.BREAK_TALK ){
+        if ( this._userStateId === this.userStatuses.BREAK || this._userStateId === this.userStatuses.BREAK_TALK ){
           return this.lastBreakReason;
         }
         return null;
@@ -2834,6 +2865,7 @@ Oktell = (function(){
     exportApi('getStatus', userStates.getWebStateStr, userStates);
     exportApi('setStatus', userStates.changeStates, userStates);
     exportApi('setUserStateBusy', userStates.setUserStateBusy, userStates);
+    exportApi('getUserState', userStates.getUserState, userStates);
     exportApi('getUserStatus', userStates.getUserStatus, userStates);
     exportApi('setUserStatus', userStates.setUserStatus, userStates);
     exportApi('getCurrentBreakReason', userStates.getCurrentBreakReason, userStates);

@@ -160,16 +160,16 @@
           breakReasonIdEl.append($("<option value="+ obj.id +">" + obj.name + "</option>"));
         });
 
-        logUserStatus( "on connect\t|\t", oktell.getUserStatus(), oktell.getCurrentBreakReason() );
+        logUserStatus( "on connect\t|\t", oktell.getUserState(), oktell.getUserStatus(), oktell.getCurrentBreakReason() );
       });
-      oktell.on('userStatusChange', function(newSt, oldSt){
-        logUserStatus("from event\t|\t", oldSt, '->', newSt, oktell.getCurrentBreakReason());
+      oktell.on('userStateChange', function(newSt, oldSt){
+        logUserStatus("from event\t|\t", oldSt, '->', newSt, oktell.getUserStatus(), oktell.getCurrentBreakReason());
         statusToChangeEl.val(newSt);
         if ( oktell.getCurrentBreakReason() ) breakReasonIdEl.val(oktell.getCurrentBreakReason())
       });
       changeStatusForm.on('submit', function(){
         oktell.setUserStatus(statusToChangeEl.val(), breakReasonIdEl.val() || breakReasonMsgEl.val(), function(data){
-          logUserStatus("from callback\t|\t", data.userStatus || data.errorMessage, oktell.getCurrentBreakReason())
+          logUserStatus("from callback\t|\t", data.userState || data.errorMessage, data.userStatus, oktell.getCurrentBreakReason())
         });
       });
 		});
@@ -368,14 +368,14 @@
 		</div>
 	</div>
   <div>
-    <h2>История user-статусов</h2>
+    <h2>История user-статусов и user-состояний</h2>
     <div>
       <textarea id="s-user-statuses" rows="10" cols="100"></textarea>
     </div>
     <div>
       <form action="javascript:void(0)" id="s-change-user-status-form">
         <label>
-          Сменить статус на
+          Сменить состояние на
           <select id="s-user-status-to-change">
             <optgroup label="not call-center">
               <option value="ready">ready</option>
