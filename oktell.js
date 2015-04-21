@@ -2253,7 +2253,6 @@ Oktell = (function(){
 
         // states, gettable in states
         BUSY: 'busy', // settable-only status
-        BREAK_TALK: 'breakTalk',
         BUSY_BREAK: 'busyBreak',
         NOPHONE: 'noPhone'
       },
@@ -2647,15 +2646,14 @@ Oktell = (function(){
               this._userStatusId = this.userStatuses.READY;
             }
 
+            this._userStateId = this.userStatuses.BUSY;
+
             if ( this.onBreak ){
               if ( this.onTask ) {
                 this._userStateId = this.userStatuses.BUSY_BREAK;
               } else {
-                this._userStateId = this.userStatuses.BREAK_TALK;
                 this._userStatusId = this.userStatuses.BREAK;
               }
-            } else {
-              this._userStateId = this.userStatuses.BUSY;
             }
             break;
           case this.states.NOPHONE:
@@ -2668,8 +2666,7 @@ Oktell = (function(){
           this._userStatusId = this.userStatuses.REDIRECT;
         }
 
-        breakReasonIsChanged = (this._userStateId === this.userStatuses.BREAK_TALK || this._userStateId === this.userStatuses.BREAK)
-          && this._previousLastBreakReason !== this.lastBreakReason;
+        breakReasonIsChanged = this._userStateId === this.userStatuses.BREAK && this._previousLastBreakReason !== this.lastBreakReason;
 
         if ( lastUserState !== this._userStateId || lastUserStatus !== this._userStatusId || breakReasonIsChanged) {
           self.trigger(apiEvents.userStateChange, this._userStateId, this._userStatusId, this.lastBreakReason);
@@ -2728,7 +2725,7 @@ Oktell = (function(){
             statusNotChanged = true;
           }
         } else {
-          if ( userStatus !== currentStatus ){
+          if ( userStatus !== currentStatus || currentState === this.userStatuses.BUSY_BREAK ){
             switch (userStatus) {
               case this.userStatuses.READY:
                 sObj = {
@@ -2820,6 +2817,14 @@ Oktell = (function(){
             }
           };
 
+          // удаляем вход или выход в call-центр, если мы уже там/не там
+          if ( sObj.oncallcenter !== undefined && sObj.oncallcenter === this.onCallCenter ){
+            delete sObj.oncallcenter
+          }
+          if ( sObj.onccmanual !== undefined && sObj.onccmanual === this.onCallCenterManual ){
+            delete sObj.onccmanual
+          }
+
           // сохраняем на сервере
           sendOktell('setuserstate', sObj, function(data){
             if ( data && data.result && enableRedirectAfterSave ){
@@ -2855,7 +2860,7 @@ Oktell = (function(){
        * Number - break reason code when reason from getBreakReasons()-collection.
        */
       getCurrentBreakReason: function(){
-        if ( this._userStateId === this.userStatuses.BREAK || this._userStateId === this.userStatuses.BREAK_TALK ){
+        if ( this._userStateId === this.userStatuses.BREAK ){
           return this.lastBreakReason;
         }
         return null;

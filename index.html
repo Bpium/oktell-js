@@ -162,9 +162,11 @@
 
         logUserStatus( "on connect\t|\t", oktell.getUserState(), oktell.getUserStatus(), oktell.getCurrentBreakReason() );
       });
-      oktell.on('userStateChange', function(newSt, oldSt){
-        logUserStatus("from event\t|\t", oldSt, '->', newSt, oktell.getUserStatus(), oktell.getCurrentBreakReason());
-        statusToChangeEl.val(newSt);
+      oldSt = 'disconnected';
+      oktell.on('userStateChange', function(state, status, breakReason){
+        logUserStatus("from event\t|\t", oldSt, '->', state, status, breakReason);
+        oldSt = state;
+        statusToChangeEl.val(state);
         if ( oktell.getCurrentBreakReason() ) breakReasonIdEl.val(oktell.getCurrentBreakReason())
       });
       changeStatusForm.on('submit', function(){
@@ -174,7 +176,6 @@
       });
 		});
 	</script>
-
 </head>
 <body style="height: 100%">
 <div class="panel_container" style="width: 300px; float: left; margin-left: 50px;"></div>
