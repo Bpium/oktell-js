@@ -2272,7 +2272,7 @@ Oktell = (function(){
       onBreak: 0,
       onTask: false,
       breakReasons: {},
-      lastBreakReason: null,
+      lastBreakReasonId: null,
 
       loadBreakReasons: function(callback) {
         var that = this;
@@ -2455,7 +2455,7 @@ Oktell = (function(){
 
         var userStateId = data.userstateid;
         if ( userStateId === this.states.BREAK || userStateId === this.states.BUSY ) {
-          this.lastBreakReason = data.lunchreasonmsg || data.lunchreasonid;
+          this.lastBreakReasonId = data.lunchreasonid;
         }
 
         // до версии 150414 параметра ontask не было, но ситуация,
@@ -2615,7 +2615,8 @@ Oktell = (function(){
       setUserStateAndStatusFromState: function(){
         var lastUserState = this._userStateId,
             lastUserStatus = this._userStatusId,
-            breakReasonIsChanged = false;
+            breakReasonIdIsChanged = false,
+            breakReasonId;
 
         switch ( this.state() ){
           case this.states.READY:
@@ -2672,11 +2673,15 @@ Oktell = (function(){
           this._userStatusId = this.userStatuses.REDIRECT;
         }
 
-        breakReasonIsChanged = this._userStateId === this.userStatuses.BREAK && this._previousLastBreakReason !== this.lastBreakReason;
+        breakReasonId = this.getCurrentBreakReason();
+        breakReasonIdIsChanged = breakReasonId && this._previousLastBreakReasonId !== breakReasonId;
 
-        if ( lastUserState !== this._userStateId || lastUserStatus !== this._userStatusId || breakReasonIsChanged) {
-          self.trigger(apiEvents.userStateChange, this._userStateId, this._userStatusId, this.lastBreakReason);
-          this._previousLastBreakReason = this.lastBreakReason;
+        if ( lastUserState !== this._userStateId || lastUserStatus !== this._userStatusId || breakReasonIdIsChanged) {
+          self.trigger(apiEvents.userStateChange, this._userStateId, this._userStatusId, breakReasonId);
+        }
+
+        if ( breakReasonIdIsChanged ){
+          this._previousLastBreakReasonId = breakReasonId;
         }
 
         return this._userStateId;
@@ -2701,31 +2706,28 @@ Oktell = (function(){
       /**
        * Set new user status
        * @param {string} userStatus
-       * @param {number|string} breakReason
+       * @param {number|string} breakReasonId
        * @param {function} callback
        */
-      setUserStatus: function(userStatus, breakReason, callback){
+      setUserStatus: function(userStatus, breakReasonId, callback){
         var currentState = this._userStateId,
             currentStatus = this._userStatusId,
             sObj = null,
             that = this,
             statusNotChanged = false,
-            enableRedirectAfterSave = false;
+            enableRedirectAfterSave = false,
+            breakReasonId = this.getCorrectBreakReasonId(breakReasonId) || null;
 
         if ( userStatus === this.userStatuses.BREAK ){
-          if ( breakReason !== this.lastBreakReason ){
+          if ( breakReasonId !== this.lastBreakReasonId || this._userStateId !== this.userStatuses.BREAK ){
             sObj = {
               userstateid: this.states.BREAK,
               oncallcenter: true,
               onredirect: false
             };
 
-            if ( breakReason ) {
-              if ( typeof breakReason === 'number' && this.breakReasons[breakReason] ) {
-                sObj.lunchreasonid = breakReason;
-              } else {
-                sObj.lunchreasonmsg = breakReason;
-              }
+            if ( breakReasonId ){
+              sObj.lunchreasonid = breakReasonId
             }
           } else {
             statusNotChanged = true;
@@ -2808,12 +2810,8 @@ Oktell = (function(){
           var afterSaveFn = function(data){
             if ( data && data.result ){
               // breakreason not come in this callback
-              if ( breakReason && (data.userstateid === that.states.BREAK || data.userstateid === that.states.BUSY) && !(data.lunchreasonid || data.lunchreasonmsg) ){
-                if ( that.breakReasons[breakReason] ) {
-                  data.lunchreasonid = breakReason;
-                } else {
-                  data.lunchreasonmsg = breakReason;
-                }
+              if ( breakReasonId && (data.userstateid === that.states.BREAK || data.userstateid === that.states.BUSY) && !data.lunchreasonid ){
+                data.lunchreasonid = breakReasonId;
               }
 
               that.saveStatesFromServer(data);
@@ -2859,15 +2857,27 @@ Oktell = (function(){
         }
       },
 
+      getCorrectBreakReasonId: function(breakReasonId){
+        if ( breakReasonId in this.breakReasons ) {
+          return Number(breakReasonId);
+        }
+
+        for ( var reasonId in this.breakReasons ) {
+          return Number(reasonId);
+        }
+
+        return null;
+      },
+
       /**
-       * Get current break reason
-       * @returns {number|string|null} Null - when user status not in ['break', 'breakTalk'].
+       * Get current break reason id
+       * @returns {number|null} Null - when user status not 'break'.
        * String - when break reason is custom.
        * Number - break reason code when reason from getBreakReasons()-collection.
        */
       getCurrentBreakReason: function(){
-        if ( this._userStateId === this.userStatuses.BREAK ){
-          return this.lastBreakReason;
+        if ( this._userStatusId === this.userStatuses.BREAK ){
+          return this.getCorrectBreakReasonId(this.lastBreakReasonId) || this.lastBreakReasonId;
         }
         return null;
       }

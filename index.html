@@ -145,7 +145,6 @@
       var statusesHistoryEl = $('#s-user-statuses'),
           statusToChangeEl = $('#s-user-status-to-change'),
           breakReasonIdEl = $('#s-break-reasons'),
-          breakReasonMsgEl = $('#s-break-reason'),
           changeStatusForm = $('#s-change-user-status-form');
       function logUserStatus(){
         var time = new Date(),
@@ -170,7 +169,7 @@
         if ( oktell.getCurrentBreakReason() ) breakReasonIdEl.val(oktell.getCurrentBreakReason())
       });
       changeStatusForm.on('submit', function(){
-        oktell.setUserStatus(statusToChangeEl.val(), breakReasonIdEl.val() || breakReasonMsgEl.val(), function(data){
+        oktell.setUserStatus(statusToChangeEl.val(), breakReasonIdEl.val(), function(data){
           logUserStatus("from callback\t|\t", data.userState || data.errorMessage, data.userStatus, oktell.getCurrentBreakReason())
         });
       });
@@ -394,10 +393,7 @@
           </select>
           , breakReason:
           <select id="s-break-reasons">
-            <option value=""></option>
           </select>
-          или
-          <input id="s-break-reason" type="text"/>
         </label>
         <button type="submit">Change status</button>
       </form>
