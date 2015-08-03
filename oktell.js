@@ -4363,7 +4363,11 @@ Oktell = (function(){
 
         if ( webphoneAuthData ) {
           setTimeout(function(){
-            connectSip(webphoneAuthData);
+            oktellVoice.createUserMedia(function(){
+              connectSip(webphoneAuthData);
+            }, function(){
+              callFunc(callback, false);
+            });
           });
         } else {
 
