@@ -4365,6 +4365,7 @@ Oktell = (function(){
           setTimeout(function(){
             oktellVoice.createUserMedia(function(){
               connectSip(webphoneAuthData);
+              webphoneAuthData = null;
             }, function(){
               callFunc(callback, false);
             });
