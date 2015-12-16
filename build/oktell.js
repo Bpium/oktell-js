@@ -1,6 +1,6 @@
 /*
  * Oktell.js
- * version 1.8.0
+ * version 1.8.1
  * http://js.oktell.ru/
  */
 
@@ -5252,7 +5252,7 @@ Oktell = (function(){
 
     };
 
-    self.version = '1.8.0';
+    self.version = '1.8.1';
 
   };
   extend( Oktell.prototype , Events );

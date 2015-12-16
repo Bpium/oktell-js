@@ -5246,7 +5246,7 @@ Oktell = (function(){
 
     };
 
-    self.version = '1.8.0';
+    self.version = '1.8.1';
 
   };
   extend( Oktell.prototype , Events );
