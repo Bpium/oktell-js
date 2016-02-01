@@ -4912,7 +4912,9 @@ Oktell = (function(){
       oktellConnected(false);
       for (var i = 0; i < nativeEventsForBindAfterConnect.length; i++) {
         var obj = nativeEventsForBindAfterConnect[i];
-        obj.binded = false;
+        if ( obj ) {
+          obj.binded = false;
+        }
       }
       phone.disableWebphone();
       if ( ! serverConnected() ) {
@@ -5246,7 +5248,7 @@ Oktell = (function(){
 
     };
 
-    self.version = '1.8.1';
+    self.version = '1.8.2';
 
   };
   extend( Oktell.prototype , Events );
