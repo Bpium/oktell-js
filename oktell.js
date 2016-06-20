@@ -4309,7 +4309,7 @@ Oktell = (function(){
       },
 
       commutate: function(){
-        if ( this.state() === this.states.TALK && this.getHoldInfo().hasHold && this.sipActive ) {
+        if ( this.state() === this.states.TALK && this.getHoldInfo().hasHold ) {
           this.endCall();
         }
       },
@@ -5248,7 +5248,7 @@ Oktell = (function(){
 
     };
 
-    self.version = '1.8.2';
+    self.version = '1.8.3';
 
   };
   extend( Oktell.prototype , Events );
