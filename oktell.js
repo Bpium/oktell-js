@@ -3353,7 +3353,7 @@ Oktell = (function(){
 
             if ( data.abonent ) {
               if ( ! data.abonent.conferenceid ) {
-                data.abonent.chainId = data.chainid;
+                data.abonent.chainid = data.chainid;
                 if ( data.calledid && !data.abonent.callerid ) {
                   data.abonent.callerid = data.calledid;
                 }
@@ -3401,7 +3401,7 @@ Oktell = (function(){
        * @return {*}
        */
       createAbonent: function(data) {
-        var key = data.competitorid || data.number || data.userid || data.callerid || ( data.chainId != '00000000-0000-0000-0000-000000000000' && data.chainId );
+        var key = data.competitorid || data.number || data.userid || data.callerid || ( data.chainid != '00000000-0000-0000-0000-000000000000' && data.chainid );
         if ( ! key && data.isivr ) {
           key = newGuid();
         }
@@ -3423,7 +3423,7 @@ Oktell = (function(){
             isConferenceHidden: data.competitorid && data.ishidden ? true : undefined,
             isExternal: data.isextline ? true : false,
 
-                        chainId: data.chainId,
+            chainId: data.chainid,
 
             phone: data.number ? data.number.toString() : ( data.callerid ? data.callerid.toString() : undefined ),
             phoneFormatted: data.number ? formatPhone( data.number.toString() ) : undefined,
@@ -5248,7 +5248,7 @@ Oktell = (function(){
 
     };
 
-    self.version = '1.8.3';
+    self.version = '1.8.4';
 
   };
   extend( Oktell.prototype , Events );
